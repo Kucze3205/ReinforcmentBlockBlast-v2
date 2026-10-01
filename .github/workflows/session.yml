@@ -1,11 +1,11 @@
 # Sesja pętli (#16). Wejście zawsze jedno: numer issue. Rola, model i budżet z etykiet + .claude/profiles.yml.
-# Nie wołaj wprost — wejście publiczne to dispatch.yml (zamek, walidacja, deduplikacja).
+# Nie wołaj wprost — wejście publiczne to dispatch.yml (walidacja, deduplikacja).
 #
 # Kod pętli (.github/loop/) biegnie z checkoutu gałęzi domyślnej (`loop/`), agent pracuje w osobnym
 # checkoutcie zadania (`work/`): agent nie może zmienić kodu, który go pilnuje.
 # Trzy kształty runnera: plain (bez emulatora), emulator (jedyna rola z Androidem), bench (bez agenta).
 name: session
-run-name: session #${{ inputs.issue }}
+run-name: session #${{ inputs.issue }}${{ inputs.role && format(' · {0}', inputs.role) || '' }}
 
 on:
   workflow_dispatch:
@@ -13,6 +13,9 @@ on:
       issue:
         description: Numer issue z etykietą rola:*
         required: true
+      role:
+        description: Rola (tylko do nazwy przebiegu)
+        required: false
 
 concurrency:
   group: session-${{ inputs.issue }}
@@ -91,9 +94,11 @@ jobs:
       - run: |
           pip install -q pyyaml numpy pillow
           pip install -q torch --index-url https://download.pytorch.org/whl/cpu
-          npm install -g @anthropic-ai/claude-code@2.1.278
+          npm install -g @anthropic-ai/claude-code@2.1.284
           git config --global user.name "github-actions[bot]"
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config --global author.name "Kucze3205"   # pętla działa w imieniu właściciela; bot zostaje committerem
+          git config --global author.email "kuczerowski2005@gmail.com"
       - id: guard
         working-directory: loop
         env:
@@ -148,9 +153,11 @@ jobs:
           sudo apt-get install -y -q tesseract-ocr
           pip install -q pyyaml numpy pillow
           pip install -q torch --index-url https://download.pytorch.org/whl/cpu
-          npm install -g @anthropic-ai/claude-code@2.1.278
+          npm install -g @anthropic-ai/claude-code@2.1.284
           git config --global user.name "github-actions[bot]"
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config --global author.name "Kucze3205"   # pętla działa w imieniu właściciela; bot zostaje committerem
+          git config --global author.email "kuczerowski2005@gmail.com"
       - name: Pobierz APK z prywatnego release
         working-directory: work
         env:
@@ -207,6 +214,8 @@ jobs:
           pip install -q torch --index-url https://download.pytorch.org/whl/cpu
           git config --global user.name "github-actions[bot]"
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config --global author.name "Kucze3205"   # pętla działa w imieniu właściciela; bot zostaje committerem
+          git config --global author.email "kuczerowski2005@gmail.com"
           git -C work checkout -q -B "task/$ISSUE"
       - id: guard
         working-directory: loop

@@ -1,0 +1,73 @@
+# Seria weryfikacyjna (#287): 10 partii równolegle na oryginale, bez sesji agenta.
+# Start: `gh workflow run seria.yml -f polityka='<spec>' -f seria=<id> [-f limit_minut=300]`.
+# Wynik partii K: artefakt `seria-<id>-partia-K` (KATALOG z pomiar.json, docs/seria-skrypt.md):
+#   gh run download <run-id> -n seria-<id>-partia-K
+name: seria
+run-name: seria ${{ inputs.seria }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      polityka:
+        description: Napis specyfikacji polityki (argv[2] mostu)
+        required: true
+      seria:
+        description: Identyfikator serii (nazwa przebiegu i artefaktów)
+        required: true
+      limit_minut:
+        description: Limit czasu partii w minutach (zegar skryptu; job ma 355 min, start apki ~3 min)
+        default: "300"
+
+# CONTEXT.md: w danej chwili trwa co najwyżej jedna seria
+concurrency:
+  group: seria
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  partia:
+    runs-on: ubuntu-latest
+    timeout-minutes: 355
+    strategy:
+      fail-fast: false
+      matrix:
+        partia: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    env:
+      KATALOG: seria-out
+      POLITYKA: ${{ inputs.polityka }}
+      LIMIT_MINUT: ${{ inputs.limit_minut }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Włącz KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Zależności mostu
+        run: |
+          sudo apt-get install -y -q tesseract-ocr
+          pip install pillow numpy
+
+      - name: Pobierz APK z prywatnego release
+        env:
+          GH_TOKEN: ${{ secrets.ASSETS_READ_TOKEN }}
+        run: gh release download v10.7.5 --repo Kucze3205/blockblast-assets --dir assets --pattern '*.apk'
+
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis_playstore
+          arch: x86_64
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -memory 4096
+          script: bash tools/seria.sh
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: seria-${{ inputs.seria }}-partia-${{ matrix.partia }}
+          path: seria-out/

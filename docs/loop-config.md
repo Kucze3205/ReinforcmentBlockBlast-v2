@@ -62,7 +62,7 @@ co wybiera rolę; lista **nie jest zamknięta** — orchestrator dokłada nowe r
 
 ### Nadpisania — lista zamknięta
 
-Domyślnie Sonnet 5 / effort medium. Etykietę nadaje **wyłącznie orchestrator**,
+Domyślnie Sonnet 5.5 (`claude-sonnet-5-5`) / effort medium. Etykietę nadaje **wyłącznie orchestrator**,
 nigdy sesja sama sobie ([#7](https://github.com/Kucze3205/ReinforcmentBlockBlast/issues/7)).
 
 | Etykieta | Nadpisuje |
@@ -70,11 +70,40 @@ nigdy sesja sama sobie ([#7](https://github.com/Kucze3205/ReinforcmentBlockBlast
 | `model:opus` | model → Opus |
 | `effort:high` | effort → high |
 
+### Cykl
+
+| Etykieta | Znaczenie |
+|---|---|
+| `loop:iteration <n>` | Numer cyklu orchestratora (`docs/journal/cykl-NNNN.md`), w którym powstało issue. Każde issue pętli ją niesie; następca dziedziczy ją po rodzicu, a issue założone przez dozorcę dostaje ostatni numer + 1. Jest **bramką pola widzenia** pętli (patrz „Pole widzenia pętli”); rolę nadal wybiera `rola:*`. Człowiek, który chce puścić własne issue przez `ready`, dodaje obie: `rola:*` i `loop:iteration N`. |
+| `loop:map` | Issue złączeniowe cyklu jako mapa cyklu (#63): sub-issues to zadania cyklu, body to indeks decyzji. Informacyjna — pętla jej nie czyta; pole widzenia i rolę nadal dają `loop:iteration N` i `rola:*`. |
+
 ### Stan
 
 | Etykieta | Znaczenie |
 |---|---|
 | `conflict` | Merge nieudany. Issue zostaje **otwarte** i odpala się ponownie ze świeżego HEAD. Konflikt nie jest porażką zadania ([#7](https://github.com/Kucze3205/ReinforcmentBlockBlast/issues/7)). |
+
+---
+
+## Pole widzenia pętli
+
+**Pętla widzi i dotyka wyłącznie issues z etykietą `loop:iteration N` (oraz z jedną `rola:*`, która mówi, kogo uruchomić).** Sama `rola:*` ani sama `ready` nie wystarcza. Właściciel
+może w tym samym repo prowadzić własne issues i branche (np. wayfinderowe) — pętla ich nie ruszy
+([#65](https://github.com/Kucze3205/ReinforcmentBlockBlast/issues/65)). Gwarantują to cztery miejsca, pilnowane testami w `tests/test_loop.py`:
+
+| Miejsce | Zachowanie |
+|---|---|
+| `loop_open()` | Jedyne źródło dla dozorcy (`kick()`) i `commitments()`: `state=open` **i** etykieta `loop:iteration N` **i** `rola:*` |
+| `dispatch.yml` | Tylko `workflow_dispatch` albo `issues: labeled` z etykietą dokładnie `ready` |
+| `resolve()` | Odrzuca issue bez `loop:iteration N` albo bez dokładnie jednej etykiety `rola:*` |
+| orchestrator | Pole widzenia = issues z `loop:iteration N`; nic spoza nich nie wchodzi do kontekstu |
+
+**Gałęzie:** `merge_main()` pcha wyłącznie na gałąź domyślną i na własne `task/<n>`; cudzej gałęzi nie tyka.
+
+**Ryzyko brzegowe — ręczna praca na `main`.** Jeśli właściciel pushuje na `main` w chwili epilogu,
+`merge_main()` dostaje odrzucony push i ponawia rebase (do 5 razy, potem `conflict`). Issues
+to nie dotyka — najwyżej zadanie wróci do kolejki ze świeżego HEAD. Kto chce mieć spokój,
+pracuje na własnej gałęzi, nie na `main`.
 
 ---
 
@@ -166,8 +195,8 @@ gałęzi — ale **czyta** także z gałęzi domyślnej. Stąd podział:
 | Partia | `task/<n>` | `userdata-qemu.img.qcow2` bieżącej partii | między ogniwami **jednej** sesji |
 
 Świeża sesja weryfikacyjna zaczyna partię od zera i to jest w porządku:
-[#9](https://github.com/Kucze3205/ReinforcmentBlockBlast/issues/9) wymaga jednej partii ≥1M w obrębie jednego łańcucha ogniw, nie ciągłości
-między sesjami.
+każda partia serii weryfikacyjnej (`CONTEXT.md`) mieści się w jednym jobie; ciągłość między sesjami nie jest
+potrzebna.
 
 **Merge na gałąź pętli w trakcie sesji weryfikacyjnej nie unieważnia jej cache'u.**
 Wpis cache'u jest związany z kluczem i gałęzią, nie z commitem, a sesja siedzi na
@@ -188,7 +217,7 @@ pracuje w osobnym checkoutcie zadania (`work/`) — agent nie zmienia kodu, któ
 
 | Plik | Wyzwalacz | Robi |
 |---|---|---|
-| `dispatch.yml` | `workflow_dispatch(issue)`; `issues: labeled` = `ready` | Jedyne publiczne wejście: dozór, walidacja, zamek (`gh issue lock`, [#22](https://github.com/Kucze3205/ReinforcmentBlockBlast/issues/22)), deduplikacja, start `session.yml`. |
+| `dispatch.yml` | `workflow_dispatch(issue)`; `issues: labeled` = `ready` | Jedyne publiczne wejście: dozór, walidacja, deduplikacja, start `session.yml`. |
 | `session.yml` | `workflow_dispatch(issue)` | `prep` (dozór, sonda, rola → profil, model, budżet) → jeden z trzech kształtów: `plain`, `emulator`, `bench`. Każdy kończy krokiem **Epilog** (`if: always()`). |
 | `watchdog.yml` | cron co 30 min | Bramka `awaria`, sonda, cztery liczniki, kopnięcia. Czerwony przebieg = mail. |
 

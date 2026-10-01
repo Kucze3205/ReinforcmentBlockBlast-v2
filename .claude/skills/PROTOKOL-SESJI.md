@@ -56,7 +56,8 @@ ostatnia wersja. Pierwszą wersję (`wip`) zakładasz zaraz na starcie.
 status: done
 commit: 9f3c1ab
 ```
-Proza: co zrobiono i dlaczego. Przy porażce — co konkretnie zawiodło.
+Proza (≤ ~15 linii): co zrobiono i dlaczego. Przy porażce — co konkretnie zawiodło.
+Szczegół trafia do plików, do których raport linkuje, nie tutaj.
 
 ## Odkrycia
 - fakt spoza zadania, który zmienia plan (opcjonalne; jeden punkt = jedno zdanie + link)

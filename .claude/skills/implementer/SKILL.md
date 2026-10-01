@@ -1,7 +1,7 @@
 ---
 name: implementer
 description: Rola pętli `rola:implementer` — zmienia kod repo (silnik, agent, kalibracja symulatora, narzędzia, sprzątanie). Bez internetu i bez emulatora. Ładowany, gdy issue ma etykietę `rola:implementer`.
-model: sonnet
+model: claude-sonnet-5-5
 effort: medium
 profile: implementer
 ---

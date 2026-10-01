@@ -19,7 +19,6 @@ permissions:
 
 jobs:
   watch:
-    if: vars.AUTOPILOT == 'on'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:

@@ -82,3 +82,28 @@ _Avoid_: błąd, awaria sesji, crash
 Sztywny skrypt na cronie, bez agenta, spoza łańcucha pętli. Wykrywa zator i
 kopie, zanim zawoła. Milczy, dopóki `awaria` jest otwarta.
 _Avoid_: watchdog, monitor, strażnik
+
+### Cel i weryfikacja
+
+**Cel**:
+Agent nie przegrywa. 1 mln punktów licznika apki to limit długości partii
+ustalony przez właściciela, nie miara poziomu: partia, która do niego dotrwa,
+dowodzi nieprzegrywania. Punkty są rozstrzygnięciem remisu, nigdy kosztem
+przeżycia.
+_Avoid_: 1 mln jako wynik do pobicia, „nasz wzór" jako licznik celu
+
+**Seria weryfikacyjna**:
+10 partii na oryginale granych równolegle, każda na osobnym emulatorze. Zaliczona,
+gdy każda z 10 dochodzi do 1 mln licznika apki bez przegranej. W danej chwili
+trwa co najwyżej jedna seria.
+_Avoid_: łańcuch weryfikacji, partia do celu (w liczbie pojedynczej)
+
+**Przegrana**:
+Koniec partii, bo żaden klocek z tacki nie mieści się na planszy — wina
+algorytmu. Liczy się do serii i blokuje cel.
+_Avoid_: śmierć (poza symulatorem), porażka, przerwanie
+
+**Przerwanie**:
+Koniec partii z winy infrastruktury: most stanął na nieznanym oknie, skończył
+się czas joba, zginął runner. Nie wlicza się do serii; partię gra się od nowa.
+_Avoid_: przegrana, awaria

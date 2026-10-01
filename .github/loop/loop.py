@@ -5,13 +5,14 @@ Zero agenta. Uruchamiany zawsze z checkoutu gałęzi domyślnej, nigdy z gałęz
 zadania — agent nie może zmienić kodu, który go pilnuje. Leży w `.github/`, więc
 pętla nie może go edytować (zakaz 2 z #7).
 
-Podpolecenia: guard, probe, route, resolve, export, publish, finalize, bench, watch.
+Podpolecenia: guard, probe, route, resolve, export, publish, finalize, bench, watch, resume.
 """
 import json
 import os
 import re
 import subprocess
 import sys
+import time
 import urllib.error
 import urllib.request
 from datetime import datetime, timedelta, timezone
@@ -23,7 +24,7 @@ BOT = "github-actions[bot]"
 # Pola raportu pisane wyłącznie przez epilog i dozorcę; publikacja raportu agenta ich nie kasuje.
 OWNED = ("proby", "wznow_po", "kopniecia", "kopniete", "konflikty", "przyczyna", "weryfikacja")
 AGENT_STATUSES = {"done", "partial", "blocked", "rejected"}
-MODEL_LABELS = {"model:opus": "opus"}       # lista zamknięta (#13); etykietę nadaje tylko orchestrator
+MODEL_LABELS = {"model:opus": "claude-opus-5-5"}       # lista zamknięta (#13); etykietę nadaje tylko orchestrator. Nowy model = sprawdź pin CLI w session.yml (#137)
 EFFORT_LABELS = {"effort:high": "high"}
 SECRETS = ("GH_TOKEN", "GITHUB_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN", "ASSETS_READ_TOKEN")
 BACKOFF_H = (1, 5, 24)                      # gdy w wyniku sesji nie ma terminu resetu limitu
@@ -31,11 +32,14 @@ MAX_ATTEMPTS = 3        # #10: próby wznowienia
 MAX_AGE_DAYS = 30       # #10: zapadka wieku
 MAX_KICKS = 3           # #10: bezskuteczne kopnięcia
 CRASH_STREAK = 3        # #26: kolejne `crashed` bez commita
+MAX_SLEEP_S = 340 * 60  # resume.yml: job ma limit 360 min; dłuższy park zostaje dozorcy
 GRACE_MIN = 30          # #10: karencja pokrywa opóźnienie dispatchu, nigdy czas pracy
 MAX_GEN = 3             # #7: limit pokoleń następców
 MAX_CONFLICTS = 3
 PROTECTED_PREFIXES = (".github/", ".claude/skills/orchestrator/")
 RECORD = "bench/record.json"
+NOTES = ("RAPORT.md", "docs/journal/")  # zapis cyklu scala się zawsze, także gdy sesja nie jest done (#66)
+ITER = "loop:iteration "                    # numer cyklu orchestratora, który założył issue; dziedziczy go następca
 
 
 # ---------------------------------------------------------------- gh
@@ -86,6 +90,21 @@ def edit_labels(n, add=(), remove=()):
         gh(*args, check=False)
 
 
+def in_loop(names):
+    """Issue należy do pętli <=> ma `loop:iteration N` (pole widzenia) i rolę (kogo uruchomić). Sama `rola:*` nie wystarcza (#65)."""
+    return any(l.startswith(ITER) for l in names) and any(l.startswith("rola:") for l in names)
+
+
+def ensure_label(name):
+    gh("label", "create", name, "--color", "C5DEF5", "--description", "Cykl pętli, w którym powstało issue", "--force", check=False)
+
+
+def last_iteration():
+    out = gh("label", "list", "--search", "loop:iteration", "--limit", "200", "--json", "name", check=False)
+    return max([int(l["name"][len(ITER):]) for l in json.loads(out or "[]")
+                if l["name"].startswith(ITER) and l["name"][len(ITER):].isdigit()] or [0])
+
+
 def blockers(n):
     return api_list("repos/%s/issues/%s/dependencies/blocked_by" % (REPO, n))
 
@@ -108,12 +127,26 @@ def goal_reached():
     return os.path.exists("GOAL_REACHED")   # cwd = checkout gałęzi domyślnej
 
 
+def say(msg):
+    """Zdanie do logu i do podsumowania przebiegu: przebieg nie kończy się bez powodu na widoku."""
+    print(msg)
+    path = os.environ.get("GITHUB_STEP_SUMMARY")
+    if path:
+        with open(path, "a", encoding="utf-8") as fh:
+            fh.write(msg + "\n\n")
+
+
+def run_issue(title):
+    """'session #12 · implementer' -> 'session #12' (nie myl #12 z #123)."""
+    return title.split(" · ")[0]
+
+
 def guard_ok():
     if not autopilot_on():
-        print("AUTOPILOT != on: stój")
+        say("AUTOPILOT != on: stój")
         return False
     if goal_reached():
-        print("GOAL_REACHED: stój")
+        say("GOAL_REACHED: stój")
         return False
     return True
 
@@ -263,8 +296,8 @@ def resolve(n):
     i = issue(n)
     labels = label_names(i)
     roles = sorted(l[5:] for l in labels if l.startswith("rola:"))
-    if i["state"] != "open" or len(roles) != 1:
-        raise SystemExit("issue %s: nieotwarte albo nie dokładnie jedna rola (%s)" % (n, roles))
+    if i["state"] != "open" or len(roles) != 1 or not in_loop(labels):
+        raise SystemExit("issue %s: nieotwarte, poza pętlą (brak `%sN`) albo nie dokładnie jedna rola (%s)" % (n, ITER, roles))
     role = roles[0]
     p = load_profiles().get(role)
     why = "brak profilu dla roli `%s` w .claude/profiles.yml" % role if not p else check_profile(role, p)
@@ -272,6 +305,7 @@ def resolve(n):
         why = "brak skilla dla roli `%s`" % role
     if why:
         close_out(n, i, "blocked", {"przyczyna": "start:" + why.split()[0]}, "Sesja nie wystartowała: " + why + ".")
+        reconcile()
         raise SystemExit(why)
     branch = "task/%s" % n
     m = re.search(r"<!-- start-branch: (\S+) -->", i["body"] or "")
@@ -282,7 +316,7 @@ def resolve(n):
         kind, model, effort = "bench", "", ""
     else:
         fm = frontmatter(role)
-        model = next((v for k, v in MODEL_LABELS.items() if k in labels), fm.get("model", "sonnet").strip())
+        model = next((v for k, v in MODEL_LABELS.items() if k in labels), fm.get("model", "claude-sonnet-5-5").strip())
         effort = next((v for k, v in EFFORT_LABELS.items() if k in labels), fm.get("effort", "medium").strip())
         kind = "emulator" if p.get("emulator") else "plain"
     timeout = int(p.get("timeout_minutes", 120))
@@ -296,27 +330,33 @@ def resolve(n):
 
 # ---------------------------------------------------------------- dispatch
 
+LAUNCHED = set()     # dispatch z tego procesu: `gh run list` pokazuje nowy przebieg z opóźnieniem
+
+
 def session_runs():
+    """Przebiegi sesji bez własnego: epilog pyta o resztę pętli, a jego przebieg jeszcze trwa."""
     out = gh("run", "list", "--workflow", "session.yml", "--limit", "100",
-             "--json", "displayTitle,status,createdAt")
-    return json.loads(out or "[]")
+             "--json", "databaseId,displayTitle,status,createdAt")
+    own = os.environ.get("GITHUB_RUN_ID", "")
+    return [r for r in json.loads(out or "[]") if str(r["databaseId"]) != own]
 
 
 def launch(n):
-    """Jedyny sposób na start sesji: walidacja, zamek (#22), deduplikacja, dispatch."""
+    """Jedyny sposób na start sesji: walidacja, deduplikacja, dispatch. Bez zamka: obcych odsiewa trusted() (#22)."""
     if not guard_ok():
         return False
     i = issue(n)
-    if i["state"] != "open" or not any(l.startswith("rola:") for l in label_names(i)):
+    if i["state"] != "open" or not in_loop(label_names(i)):
         return False
     if not is_unblocked(n):
         return False
-    if any(r["displayTitle"] == "session #%s" % n and r["status"] in ("queued", "in_progress", "waiting")
+    if any(run_issue(r["displayTitle"]) == "session #%s" % n and r["status"] in ("queued", "in_progress", "waiting")
            for r in session_runs()):
         return False
-    gh("issue", "lock", str(n), check=False)
-    gh("workflow", "run", "session.yml", "-f", "issue=%s" % n)
-    print("launch #%s" % n)
+    roles = [l[5:] for l in label_names(i) if l.startswith("rola:")]
+    gh("workflow", "run", "session.yml", "-f", "issue=%s" % n, "-f", "role=%s" % (roles[0] if len(roles) == 1 else ""))
+    LAUNCHED.add(n)
+    say("launch #%s" % n)
     return True
 
 
@@ -324,6 +364,19 @@ def unblock(closed):
     for d in api_list("repos/%s/issues/%s/dependencies/blocking" % (REPO, closed)):
         if d["state"] == "open":
             launch(d["number"])
+
+
+def halt_dependents(closed, status):
+    """Producent nie dowiózł (#114): konsument nie rusza na pusto, tylko zamyka się jako `blocked` (kaskadą
+    dalej). Orchestrator rusza normalnie: to on decyduje, co z niedowiezionym cyklem."""
+    for d in api_list("repos/%s/issues/%s/dependencies/blocking" % (REPO, closed)):
+        if d["state"] != "open":
+            continue
+        if "rola:orchestrator" in label_names(d):
+            launch(d["number"])
+        else:
+            close_out(d["number"], d, "blocked", {"przyczyna": "producent-#%s-%s" % (closed, status)},
+                      "Producent #%s zamknięty jako `%s`: nie dowiózł, więc to zadanie nie ruszyło." % (closed, status))
 
 
 # ---------------------------------------------------------------- epilog
@@ -365,7 +418,33 @@ def machine_cause(exec_path, exit_code):
     if m:
         ts = int(m.group(1))
         reset = datetime.fromtimestamp(ts / 1000 if ts > 10**11 else ts, timezone.utc)
-    return " ".join(parts), limited, reset
+    return " ".join(parts), limited, reset or text_reset(raw)
+
+
+RESET_TEXT = re.compile(r"resets\s+(?:([A-Z][a-z]{2})\s+(\d{1,2}),?\s+(?:at\s+)?)?(\d{1,2})(?::(\d{2}))?\s*([ap]m)\s*(?:\(([^)]+)\))?", re.I)
+
+
+def text_reset(raw, ref=None):
+    """'resets 7:20am (UTC)' / 'resets Oct 2, 5am (Europe/Warsaw)': termin z tekstu CLI, gdy brak `resetsAt`."""
+    m = RESET_TEXT.search(raw)
+    if not m:
+        return None
+    mon, day, h, mi, ap, tz = m.groups()
+    try:
+        from zoneinfo import ZoneInfo
+        zone = ZoneInfo(tz) if tz else timezone.utc
+    except Exception:
+        zone = timezone.utc
+    ref = (ref or now()).astimezone(zone)
+    h = int(h) % 12 + (12 if ap.lower() == "pm" else 0)
+    t = ref.replace(hour=h, minute=int(mi or 0), second=0, microsecond=0)
+    if mon:
+        t = t.replace(month=datetime.strptime(mon[:3].title(), "%b").month, day=int(day))
+        if t < ref - timedelta(days=1):
+            t = t.replace(year=t.year + 1)
+    elif t <= ref:
+        t += timedelta(days=1)
+    return t.astimezone(timezone.utc)
 
 
 def run_verification(work, body):
@@ -375,6 +454,7 @@ def run_verification(work, body):
     cmds = [c.strip() for c in cmds] or re.findall(r"`([^`\n]+)`", text)
     for c in cmds:
         r = subprocess.run(["bash", "-c", c], cwd=work, env=clean_env(), capture_output=True, text=True, timeout=3600)
+        print("$ %s\n%s%s" % (c, r.stdout, r.stderr))     # liczby z udanych poleceń zostają w logu joba (#90)
         if r.returncode:
             return False, c + "\n" + (r.stdout + r.stderr)[-1500:]
     return True, ""
@@ -382,10 +462,20 @@ def run_verification(work, body):
 
 def bench(n, work):
     """`rola:bench`: job liczący bez sesji Claude'a. Polecenia bierze z `## Weryfikacja`."""
+    base = git(work, "rev-parse", "HEAD").stdout.strip()
     ok, out = run_verification(work, issue(n)["body"])
+    commit_bench(n, work)   # przed oceną: wynik przeżywa polecenie, które padło po pomiarze (#90)
+    # „policzono" = bench/*.json zmienione w tym jobie, w katalogu albo w commitach poleceń (#99)
+    if ok and not git(work, "diff", "--name-only", base, "HEAD", "--", "bench/*.json").stdout.strip():
+        ok, out = False, "Polecenia z `## Weryfikacja` przeszły, ale żaden bench/*.json nie przybył ani się nie zmienił: nic nie policzono."
     print(out)
     with open(os.path.join(os.environ.get("RUNNER_TEMP", "/tmp"), "agent-exit"), "w") as fh:
         fh.write("0" if ok else "1")
+
+
+def commit_bench(n, work):
+    git(work, "add", "-A", "bench")
+    git(work, "commit", "-q", "-m", "bench: wynik zadania #%s" % n, check=False)
 
 
 def merge_main(n, role, work):
@@ -409,6 +499,27 @@ def merge_main(n, role, work):
     return "conflict", ""
 
 
+def notes_only(changed):
+    return [f for f in changed if f == NOTES[0] or f.startswith(NOTES[1])]
+
+
+def merge_notes(work):
+    """Sesja niedokończona nie scala kodu, ale jej dziennik i raport nie mogą zostać na task/N."""
+    d = os.environ.get("DEFAULT_BRANCH", "main")
+    head = git(work, "rev-parse", "HEAD").stdout.strip()
+    for _ in range(5):
+        git(work, "fetch", "origin", d)
+        files = notes_only(git(work, "diff", "--name-only", "--diff-filter=AM", "origin/%s...%s" % (d, head)).stdout.split())
+        if not files:
+            return False
+        git(work, "checkout", "-q", "--detach", "origin/%s" % d)
+        git(work, "checkout", head, "--", *files)
+        git(work, "commit", "-q", "-m", "Zapis cyklu z niedokończonej sesji: %s" % ", ".join(files), check=False)
+        if git(work, "push", "origin", "HEAD:refs/heads/%s" % d, check=False).returncode == 0:
+            return True
+    return False
+
+
 def spawn_successor(n, i, report_body):
     m = re.search(r"^## Następca\s*\ntytuł:\s*(.+)\ntreść:\s*(.*?)(?=^## |\Z)", report_body, re.S | re.M)
     if not m:
@@ -417,7 +528,7 @@ def spawn_successor(n, i, report_body):
     gen = max([int(l.split(":")[1]) for l in labels if l.startswith("pokolenie:")] or [0])
     if gen >= MAX_GEN:
         return None
-    keep = [l for l in labels if l.startswith(("rola:", "model:", "effort:"))] + ["pokolenie:%s" % (gen + 1)]
+    keep = [l for l in labels if l.startswith(("rola:", "model:", "effort:", ITER))] + ["pokolenie:%s" % (gen + 1)]
     body = m.group(2).strip() + "\n\n<!-- start-branch: task/%s -->\n" % n
     args = ["issue", "create", "--title", m.group(1).strip(), "--body-file", "-"]
     for l in keep:
@@ -436,7 +547,10 @@ def close_out(n, i, status, upd, prose):
     edit_labels(n, add=["report:unread"], remove=["blocked:rate-limit", "conflict"])
     succ = spawn_successor(n, i, body) if status == "partial" else None
     gh("issue", "close", str(n), "--reason", "completed" if status == "done" else "not planned", check=False)
-    unblock(n)
+    if status == "done":
+        unblock(n)
+    elif not succ:     # następca przejął krawędzie rodzica: konsumenci czekają na niego
+        halt_dependents(n, status)
     if succ:
         launch(succ)
 
@@ -464,6 +578,8 @@ def finalize(n, work):
         status = "paused" if limited else "crashed"
         prose = ("Limit subskrypcji; wznowienie zaplanowane." if limited
                  else "Agent nie zostawił statusu terminalnego (%s)." % (cause or "bez przyczyny"))
+    if role == "bench":
+        commit_bench(n, work)   # krok bench zabity limitem czasu nie zdążył scommitować
     # nic z gałęzi nie ginie z runnerem
     if git(work, "rev-parse", "--verify", "-q", "HEAD", check=False).returncode == 0:
         git(work, "push", "-f", "origin", "HEAD:refs/heads/task/%s" % n, check=False)
@@ -475,9 +591,6 @@ def finalize(n, work):
         if not ok:
             status, prose = "partial", "Epilog uruchomił `## Weryfikacja` i dostał błąd:\n```\n%s\n```" % out
             upd["weryfikacja"] = "fail"
-    if role == "bench" and status == "done":
-        git(work, "add", "-A", "bench")
-        git(work, "commit", "-q", "-m", "bench: wynik zadania #%s" % n, check=False)
     if status == "done":
         result, out = merge_main(n, role, work)
         if result == "conflict":
@@ -493,6 +606,8 @@ def finalize(n, work):
             status, prose = "blocked", "Zmiana dotyka chronionych ścieżek: %s. Scalenie odrzucone." % out
         elif result == "tests":
             status, prose = "partial", "Testy po rebase na gałąź domyślną czerwone:\n```\n%s\n```" % out
+    if status != "done" and status != "paused" and role != "bench":
+        merge_notes(work)
     if status == "paused":
         k = int(f.get("proby", 0)) + 1
         age = (now() - parse_time(i["created_at"])).days
@@ -502,13 +617,19 @@ def finalize(n, work):
             when = reset or now() + timedelta(hours=BACKOFF_H[min(k - 1, len(BACKOFF_H) - 1)])
             update_report(n, dict(upd, status="paused", proby=k, wznow_po=when.strftime("%Y-%m-%dT%H:%M:%SZ")), prose)
             edit_labels(n, add=["blocked:rate-limit"])
+            # zegar w workflow: cron GitHuba spóźnia się o godziny, a park ma termin co do minuty
+            gh("workflow", "run", "resume.yml", "-f", "issue=%s" % n, check=False)
             return
+    ahead = git(work, "rev-list", "--count", "origin/%s..HEAD" % os.environ.get("DEFAULT_BRANCH", "main"), check=False).stdout.strip()
+    if status != "done" and ahead not in ("", "0"):
+        # scommitowana praca nie ginie, tylko czeka: orchestrator wskazuje ją następcy (#114)
+        prose += ("\n\nPraca zostaje na `task/%s` (%s commitów ponad gałąź domyślną). Następca startuje z niej, "
+                  "gdy ma w treści `<!-- start-branch: task/%s -->`." % (n, ahead, n))
     close_out(n, i, status, upd, prose)
 
 
 def launch_again(n):
     # konflikt nie jest porażką zadania (#7): to samo issue, ponownie
-    gh("issue", "unlock", str(n), check=False)
     launch(n)
 
 
@@ -519,11 +640,15 @@ def open_awaria(title, why, todo):
     gh("issue", "create", "--title", "AWARIA: " + title, "--label", "awaria", "--body-file", "-", inp=body)
 
 
+def awaria_open():
+    awarie = json.loads(gh("issue", "list", "--label", "awaria", "--state", "open", "--json", "number") or "[]")
+    if awarie:
+        say("cisza: awaria otwarta #%s" % awarie[0]["number"])     # jedyny stan, w którym brak przebiegów nie jest zatorem
+    return bool(awarie)
+
+
 def watch():
-    if not guard_ok():
-        return 0
-    if gh("issue", "list", "--label", "awaria", "--state", "open", "--json", "number").strip() not in ("", "[]"):
-        print("awaria otwarta: cisza")     # jedyny stan, w którym brak przebiegów nie jest zatorem
+    if not guard_ok() or awaria_open():
         return 0
     red = False
     code = probe()
@@ -531,28 +656,46 @@ def watch():
         open_awaria("martwe poświadczenie Claude (HTTP %s)" % code,
                     "Sonda `CLAUDE_CODE_OAUTH_TOKEN` zwróciła %s. Żadna sesja nie wstanie." % code,
                     "Wygeneruj nowy token (`claude setup-token`) i zapisz jako sekret repo. Potem zdejmij etykietę `awaria`.")
+        say("awaria: martwe poświadczenie Claude (HTTP %s)" % code)
         return 1     # czerwony przebieg z crona = mail do autora pliku workflow
     assets = subprocess.run(["curl", "-s", "-o", "/dev/null", "-w", "%{http_code}", "-H",
                              "Authorization: Bearer " + os.environ.get("ASSETS_READ_TOKEN", ""),
                              "https://api.github.com/repos/Kucze3205/blockblast-assets"],
                             capture_output=True, text=True).stdout
     if assets in ("401", "403", "404"):
-        print("ASSETS_READ_TOKEN martwy (%s): sam mail, bez awarii — gatuje tylko verifiera" % assets)
+        say("ASSETS_READ_TOKEN martwy (%s): sam mail, bez awarii — gatuje tylko verifiera" % assets)
         red = True
+    return drive() or (1 if red else 0)
+
+
+def reconcile():
+    """Koniec każdej sesji: pętla bez zobowiązań rusza od razu, nie przy następnym cronie (ten spóźnia się o godziny)."""
+    if guard_ok() and not awaria_open():
+        drive()
+
+
+def drive():
+    """Wspólny ogon dozorcy i epilogu: seria padów -> awaria; zaparkowane po terminie -> wznów; brak zobowiązań -> kopnij."""
     if crash_streak():
         open_awaria("%s sesje z rzędu padły bez commita" % CRASH_STREAK,
                     "Trzy ostatnie sesje zakończyły się `crashed` bez commita. Licznik jest ślepy na przyczynę.",
                     "Obejrzyj przyczynę maszynową w raportach ostatnich sesji (pole `przyczyna`) i napraw.")
+        say("awaria: %s sesje z rzędu padły bez commita" % CRASH_STREAK)
         return 1
-    red = watch_parked() or red
+    watch_parked()
     if commitments():
-        return 1 if red else 0
-    return kick() or (1 if red else 0)
+        say("cisza: zobowiązania w toku")
+        return 0
+    return kick()
 
 
 def crash_streak():
+    # seria liczy się od zamknięcia ostatniej awarii: te same pady nie otwierają jej drugi raz (#137)
+    awarie = json.loads(gh("issue", "list", "--label", "awaria", "--state", "closed", "--json", "closedAt", "--limit", "5") or "[]")
+    since = max((a["closedAt"] for a in awarie), default="")
     closed = [x for x in api_list("repos/%s/issues?state=closed&sort=updated&direction=desc&per_page=30&labels=report:unread" % REPO)
-              if any(l["name"].startswith("rola:") and l["name"] != "rola:bench" for l in x["labels"])]
+              if x["closed_at"] > since
+              and any(l["name"].startswith("rola:") and l["name"] != "rola:bench" for l in x["labels"])]
     if len(closed) < CRASH_STREAK:
         return False
     for x in closed[:CRASH_STREAK]:
@@ -561,6 +704,37 @@ def crash_streak():
         if f.get("status") != "crashed" or f.get("commit"):
             return False
     return True
+
+
+def parked_until(n):
+    """`wznow_po` bieżącego parku albo None, gdy issue już nie jest zaparkowane."""
+    if "blocked:rate-limit" not in label_names(issue(n)):
+        return None
+    r = find_report(n)
+    return fields(r["body"]).get("wznow_po") if r else None
+
+
+def resume(n):
+    """Śpi do `wznow_po` i wznawia zaparkowane issue. Powtórka dozorcy jest nieszkodliwa: launch deduplikuje.
+    Po przebudzeniu park musi być ten sam: nowy park (inny termin) ma własny przebieg resume z epilogu."""
+    r = find_report(n)
+    due = fields(r["body"]).get("wznow_po") if r else None
+    if not due:
+        say("#%s: brak wznow_po, wznowienie zostaje dozorcy" % n)
+        return
+    wait = (parse_time(due) - now()).total_seconds()
+    if wait > MAX_SLEEP_S:
+        # termin dalej niż limit joba: śpij, ile wolno, i przekaż zegar następnemu przebiegowi
+        say("#%s: termin %s poza limitem joba, śpię %s s i przekazuję zegar dalej" % (n, due, MAX_SLEEP_S))
+        time.sleep(MAX_SLEEP_S)
+        if parked_until(n) == due:
+            gh("workflow", "run", "resume.yml", "-f", "issue=%s" % n, check=False)
+        return
+    if wait > 0:
+        say("#%s: śpię %s s do %s" % (n, int(wait), due))
+        time.sleep(wait)
+    if parked_until(n) == due and launch(n):
+        say("#%s: wznowiono o czasie" % n)
 
 
 def watch_parked():
@@ -578,18 +752,21 @@ def watch_parked():
     return False
 
 
-def rola_open():
+def loop_open():
+    """Jedyne źródło issues dla dozorcy i zobowiązań: bez `loop:iteration N` pętla issue nie widzi (#65)."""
     return [x for x in api_list("repos/%s/issues?state=open" % REPO)
-            if "pull_request" not in x and any(l["name"].startswith("rola:") for l in x["labels"])]
+            if "pull_request" not in x and in_loop({l["name"] for l in x["labels"]})]
 
 
 def commitments():
     """Pętla żyje <=> istnieje zobowiązanie: przebieg w toku, park z terminem w przyszłości, świeży dispatch (#10)."""
+    if LAUNCHED:
+        return True
     runs = session_runs()
     if any(r["status"] in ("queued", "in_progress", "waiting") for r in runs):
         return True
-    recent = {r["displayTitle"] for r in runs if now() - parse_time(r["createdAt"]) < timedelta(minutes=GRACE_MIN)}
-    for x in rola_open():
+    recent = {run_issue(r["displayTitle"]) for r in runs if now() - parse_time(r["createdAt"]) < timedelta(minutes=GRACE_MIN)}
+    for x in loop_open():
         names = label_names(x)
         r = find_report(x["number"])
         f = fields(r["body"]) if r else {}
@@ -602,14 +779,17 @@ def commitments():
 
 def kick():
     """Zator: kopnij, zanim zawołasz. Bezskuteczne kopnięcia liczy raport issue (#10)."""
-    ready = [x for x in rola_open() if is_unblocked(x["number"])
+    ready = [x for x in loop_open() if is_unblocked(x["number"])
              and "blocked:rate-limit" not in label_names(x)]
     if not ready:
         # czysta śmierć: zero otwartych issues to zator, nie sukces. Nowy orchestrator ze sztywnego szablonu.
-        url = gh("issue", "create", "--title", "Cykl orchestratora wznowiony przez dozorcę", "--label", "rola:orchestrator",
+        it = ITER + str(last_iteration() + 1)
+        ensure_label(it)
+        url = gh("issue", "create", "--title", "Cykl orchestratora wznowiony przez dozorcę", "--label", "rola:orchestrator", "--label", it,
                  "--body-file", "-", inp="## Cel\n\nPętla zatrzymała się bez otwartych issues. Przeczytaj najnowszy `docs/journal/cykl-*.md` (sekcja `## Stan`) i zbuduj następną mapę.\n\n"
                  "## Kryteria akceptacji\n\n- [ ] wpis dziennika i mapa zadań z rolami i krawędziami\n\n## Kontekst\n\n`docs/loop-config.md`\n").strip()
         ready = [issue(int(url.rsplit("/", 1)[1]))]
+        say("pętla pusta: nowy orchestrator %s" % url)
     for x in ready[:12]:
         n = x["number"]
         r = find_report(n)
@@ -619,9 +799,11 @@ def kick():
             open_awaria("dozorca kopnął #%s %s razy, przebieg nie powstał" % (n, MAX_KICKS),
                         "Dispatch nie tworzy przebiegu (zepsuty workflow, odrzucone wywołanie, zdarzenie zgubione).",
                         "Sprawdź `.github/workflows/`, zakładkę Actions i uprawnienia tokenu.")
+            say("awaria: dozorca kopnął #%s %s razy, przebieg nie powstał" % (n, MAX_KICKS))
             return 1
         update_report(n, {"kopniecia": k, "kopniete": now().strftime("%Y-%m-%dT%H:%M:%SZ")})
-        launch(n)
+        if launch(n):
+            say("kopnięto #%s" % n)
     return 0
 
 
@@ -651,12 +833,16 @@ def main(argv):
         return 0
     if cmd == "finalize":
         finalize(int(args[0]), args[1])
+        reconcile()
         return 0
     if cmd == "bench":
         bench(int(args[0]), args[1])
         return 0
     if cmd == "watch":
         return watch()
+    if cmd == "resume":
+        resume(int(args[0]))
+        return 0
     raise SystemExit("nieznane polecenie: " + cmd)
 
 

@@ -22,7 +22,7 @@ implementer:
   internet: false
   emulator: false
   write: ["**"]
-  tools: ["Read", "Grep", "Glob", "Write", "Edit", "Bash(python:*)", "Bash(pytest:*)", "Bash(git:*)", "Bash(gh release:*)"]
+  tools: ["Read", "Grep", "Glob", "Write", "Edit", "Bash(python:*)", "Bash(python3:*)", "Bash(pytest:*)", "Bash(git:*)", "Bash(gh release:*)"]
   max_turns: 100
   timeout_minutes: 240
 
@@ -38,7 +38,7 @@ verifier:
   internet: false
   emulator: true
   write: ["bridge/runs/**"]
-  tools: ["Read", "Grep", "Glob", "Write", "Bash(adb:*)", "Bash(python:*)", "Bash(git:*)"]
+  tools: ["Read", "Grep", "Glob", "Write", "Bash(adb:*)", "Bash(python:*)", "Bash(python3:*)", "Bash(git:*)"]
   max_turns: 120
   timeout_minutes: 300
 

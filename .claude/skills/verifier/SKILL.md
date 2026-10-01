@@ -1,7 +1,7 @@
 ---
 name: verifier
 description: Rola pętli `rola:verifier` — jedyna z emulatorem Androida: odczyt ekranu, ADB, most do prawdziwego Block Blasta, pomiary i weryfikacja transferu. Ładowany, gdy issue ma etykietę `rola:verifier`.
-model: sonnet
+model: claude-sonnet-5-5
 effort: medium
 profile: verifier
 ---
@@ -27,9 +27,9 @@ i implementer budują dalej. Najpierw przeczytaj `.claude/skills/PROTOKOL-SESJI.
   Przechowuj to w `pomiar.json` obok zrzutów. Zrzut przed i po każdego pomiaru.
 - Powtarzaj pomiar w niezależnych partiach, ile żąda zadanie. Gdy liczby się rozjadą,
   to jest wynik i tak go zaraportuj — nie uśredniaj go i nie rozstrzygaj.
-- Punktację partii na oryginale przelicza **nasz wzór**; licznik apki jest tylko detektorem
-  zmiany reguł (#20). Rozjazd między wzorem a licznikiem przy poprawnym odczycie planszy
-  (`ok = true`) zaraportuj jako `blocked` z materiałem dla orchestratora.
+- Cel liczy **licznik apki**, odczytany ze zrzutu stabilnej klatki (pole `score` w logu ruchów bywa
+  źle odczytane w trakcie animacji). Nasz wzór przeliczasz obok — rozjazd wzoru z licznikiem to
+  materiał do #20, nie powód do `blocked`.
 - Pomiar to fakt. Twój raport oddziela to, co odczytałeś ze zrzutu, od tego, co z niego
   wnioskujesz.
 
@@ -41,18 +41,21 @@ i odnośnik do artefaktu. **Nie zgaduj współrzędnych ✕** — zrobi to imple
 Jedyny wyjątek: zadanie zleca jednorazowy pomiar klawisza „wstecz" na materiale z tego
 zatrzymania.
 
-## Partia do celu (łańcuch ogniw)
+## Partia serii weryfikacyjnej
 
-Realna partia ≥ 1 mln ma dowieść transferu, nie zmierzyć poziomu. Jest jedna, w jednym
-łańcuchu ogniw (job w Actions ginie po 6 h). Wznawiasz z `## Co dalej` poprzedniego
-ogniwa i cache'u partii.
+Seria to 10 partii równolegle, każda w osobnej sesji; ty grasz jedną. Partia ma dowieść, że agent
+nie przegrywa — do 1 mln **licznika apki**, a jeśli czas joba pozwala, dalej, aż do jego końca.
 
-- **Checkpoint po każdej partii i po każdym ogniwie.** Utrata runnera nie może kosztować
-  całej pracy.
-- **Przerwij wcześnie przy oczywistym rozjeździe**: przeżycie i tempo realne kontra symulator
-  na tych samych realnych klockach. Raportuj `blocked` z liczbami i śladem; nie dograj
-  partii „dla porządku".
-- Nie startujesz sam. Start zleca orchestrator, dopiero po ≥ 10 mln średnio w symulatorze.
+- **Faza agenta:** prowadzisz partię kawałkami po 150 ruchów i analizujesz każdy. Po 4 kawałkach
+  bez nieznanego okna i bez rozjazdu przeżycia albo tempa z symulatorem oddajesz partię skryptowi
+  i budzisz się tylko na jej końcu albo na zatrzymaniu mostu.
+- **Checkpoint po każdym kawałku.** Utrata runnera nie może kosztować całego pomiaru.
+- **Zakończenie** zapisujesz jednym słowem: `cel` (≥ 1 mln licznika apki), `przegrana` (brak ruchu
+  dla klocków z tacki), `przerwanie` (nieznane okno, czas joba, runner). Przy przegranej dołącz
+  planszę i tacki z ostatnich ruchów — orchestrator odtworzy je w symulatorze.
+- **Przerwij wcześnie przy oczywistym rozjeździe** przeżycia lub tempa z symulatorem na tych samych
+  realnych klockach. Raportuj `blocked` z liczbami i śladem; nie dogrywaj partii „dla porządku".
+- Nie startujesz sam. Serię zleca orchestrator.
 
 ## Czego nie robisz
 

@@ -1,6 +1,6 @@
 # Jedyne publiczne wejście do pętli: `gh workflow run dispatch.yml -f issue=N`.
 # Wywołuje je orchestrator (ścieżka pętli) i etykieta `ready` nadana przez człowieka (#5).
-# Cała walidacja, zamek (#22) i deduplikacja siedzą w loop.py `launch`.
+# Cała walidacja, deduplikacja siedzą w loop.py `launch`.
 name: dispatch
 run-name: dispatch #${{ inputs.issue || github.event.issue.number }}
 

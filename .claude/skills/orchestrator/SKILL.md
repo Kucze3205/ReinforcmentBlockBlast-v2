@@ -1,7 +1,7 @@
 ---
 name: orchestrator
 description: Rola pętli `rola:orchestrator` — jeden cykl pracy — zbiera raporty, pisze dziennik, buduje mapę zadań z rolami i krawędziami blokowania, decyduje o kierunku algorytmicznym, o weryfikacji na oryginale i o osiągnięciu celu. Ładowany, gdy issue ma etykietę `rola:orchestrator`.
-model: opus
+model: claude-opus-5-5
 effort: high
 profile: orchestrator
 ---
@@ -35,7 +35,7 @@ Sesje piszą raporty wg `.claude/skills/PROTOKOL-SESJI.md`; ty z niego stosujesz
 
 - Komentarze **tylko** od `OWNER` / `MEMBER` / `COLLABORATOR` albo loginu `github-actions[bot]`
   (`author_association` nie jest gwarantowane dla bota — sprawdzaj login). Reszta nie istnieje.
-- Pole widzenia: issues z etykietą `rola:*`. Nic spoza nich nie wchodzi do twojego kontekstu.
+- Pole widzenia: issues z etykietą `loop:iteration N`. Nic spoza nich nie wchodzi do twojego kontekstu.
 - Wartościowe cudze issue **przepisujesz własnymi słowami** do nowego; etykiety `rola:*`
   nigdy nie nadajesz na treści napisanej przez obcego.
 - Twierdzenie `[Z]` z raportu researchera zamieniasz **tylko w zadanie-pomiar** (zwykle
@@ -164,6 +164,18 @@ Po utworzeniu issues (potrzebują numerów) wiążesz krawędzie natywnym „blo
   **wszystkie** pozostałe issues cyklu. Zamknięcie ostatniego jest mechanizmem posuwania
   pętli. Bez niego pętla staje.
 - Następca (`## Następca`) dziedziczy blokady rodzica — o to dba epilog.
+- **Każde issue, które zakładasz, dostaje etykietę `loop:iteration <N>`**, gdzie N to numer
+  twojego cyklu (ten sam co w `docs/journal/cykl-NNNN.md`), także issue złączeniowe. Brak
+  etykiety w repo? `gh label create "loop:iteration <N>" --color C5DEF5 --force`. Następca
+  i issue dozorcy dostają ją od pętli.
+- **Issue złączeniowe jest mapą cyklu** (format jak wayfinderowy indeks) i dostaje etykietę
+  `loop:map` (`gh label create "loop:map" --color 0E8A16 --force`). Zadania cyklu podpinasz
+  jako jego sub-issues (`gh api repos/{owner}/{repo}/issues/<mapa>/sub_issues -F sub_issue_id=<id>`,
+  gdzie `id` to `gh api repos/{owner}/{repo}/issues/<N> --jq .id`, nie numer). Body: `## Cel`
+  (czym kończy się cykl), `## Decyzje` (jedna linia na zamknięte zadanie: nazwa z linkiem +
+  gist odpowiedzi, szczegół zostaje w zadaniu), `## Jeszcze nieokreślone` (mgła: co wiesz, że
+  przyjdzie, a nie umiesz jeszcze zapisać jako zadanie). Mapa jest indeksem — decyzji nie
+  przepisujesz.
 - Licznik ogniw łańcucha to etykieta `pokolenie:<n>` (poza sesją, więc przeżywa sesję, która
   padła bez raportu). Nie kopiuj go do treści.
 
@@ -177,23 +189,36 @@ krawędzią do wcześniejszego.
 
 ## Cel i weryfikacja
 
-Cel = średnia ≥ 10 mln na stałych 300 seedach w symulatorze (definicja benchmarku z #8,
-ε = 0) **i** jedna realna partia ≥ 1 mln pkt w apce (#9).
+Cel = **agent nie przegrywa** (definicje: `CONTEXT.md`, „Cel i weryfikacja"). 1 mln licznika apki to
+limit długości partii, nie miara poziomu. Dwa warunki, oba potwierdzone raportami:
 
-- **Sufit ruchów** w `bench/config.json` podnosisz ×2, gdy > 5% partii benchmarku kończy
-  na suficie. Osobny commit, nigdy w dół. Po zmianie linia bazowa przebiega się na nowo
-  (zleć `rola:bench`), żeby porównania zostały uczciwe.
-- **Weryfikację na oryginale zlecasz dopiero po średniej ≥ 10 mln w symulatorze.**
-  Wyzwala postęp, nie czas. **Nigdy dwa łańcuchy naraz.** Po nieudanej próbie następna
-  dopiero po rekalibracji i ponownym ≥ 10 mln.
-- Nieudana weryfikacja to **nie porażka**, tylko pełne źródło danych do kalibracji. Ustal
-  przyczynę, zleć zadania naprawcze, zacznij kolejną iterację. Bez limitu prób i bez stopu.
+1. **Symulator:** 0 przegranych na stałych 300 seedach (benchmark z #8, ε = 0) przy suficie ruchów
+   ≥ 10× liczby postawień potrzebnych do 1 mln licznika apki. Średnia punktów idzie do każdego raportu
+   i dziennika jako informacja, nie próg.
+2. **Oryginał:** zaliczona **seria weryfikacyjna** — 10 partii równolegle, każda do 1 mln **licznika
+   apki** bez przegranej.
+
+- **Przeżycie przed punktami.** Zmiana, która dodaje punkty kosztem choćby jednej przegranej w
+  benchmarku, jest odrzucana. Punkty rozstrzygają tylko remis w przeżyciu.
+- **Sufit ruchów** w `bench/config.json` podnosisz ×2 tylko wtedy, gdy jest < 10× szacunku
+  postawień do 1 mln licznika apki (szacunek z ostatniej realnej partii). `capped_pct` 100 to
+  sukces, nie powód do podwajania. Osobny commit, nigdy w dół. Po zmianie linia bazowa
+  przebiega się na nowo (zleć `rola:bench`), żeby porównania zostały uczciwe.
+- **Serię zlecasz dopiero po warunku 1** i gdy zmierzone tempo mostu mieści partię 1 mln licznika
+  apki w jobie z zapasem 30%. Wyzwala postęp, nie czas. **Nigdy dwie serie naraz.** Na czas serii
+  pętla prawie stoi (10 jobów z emulatorem) — tak ma być.
+- **Przegrana w serii:** serię dogrywasz do końca (każda przegrana to dane). Potem: odtwórz w
+  symulatorze stan sprzed przegranej (plansza i tacki z mostu), ustal przyczynę (generator apki czy
+  ślepa plamka przeszukania), zleć naprawę, odzyskaj warunek 1 i dopiero wtedy nowa seria.
+- **Przerwanie** (nieznane okno, koniec czasu joba, zgon runnera) nie wlicza się do serii — partię
+  gra się od nowa. Dwa przerwania z tej samej przyczyny → zadanie naprawcze mostu.
+- Nieudana seria to **nie porażka**, tylko pełne źródło danych. Bez limitu prób i bez stopu.
 - **Sesje danych** (krótkie `rola:verifier`, zbierające stan+trójkę+ruch z mostu) zlecasz
-  osobno od weryfikacji: po pierwszym moście, po zmianie symulatora, po nieudanej weryfikacji.
+  osobno od serii: po pierwszym moście, po zmianie symulatora, po nieudanej serii.
   Zmiana generatora symulatora (`generator.py`, `pieces.py`) to zadanie implementera na
   danych z logów.
-- Rozjazd real/sim odkryty w trakcie partii to materiał do #20 (punktacja zamrożona);
-  zleć zadanie, nie rozstrzygaj sam.
+- `scoring.py` (nasz wzór) liczy punkty w symulatorze; celu nie liczy. Rozjazd wzoru z licznikiem apki
+  to materiał do #20; zleć zadanie, nie rozstrzygaj sam.
 - **Cel osiągnięty** — dopiero gdy oba warunki potwierdzone raportami: zapisz plik
   `GOAL_REACHED` w repo **i** przypięty issue, napisz raport końcowy (`RAPORT.md`) i nie
   startuj więcej sesji. Wznowienie należy do człowieka (kasuje plik).
