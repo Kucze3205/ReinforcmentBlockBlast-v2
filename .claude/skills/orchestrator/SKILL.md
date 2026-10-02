@@ -27,7 +27,7 @@ Sesje piszą raporty wg `.claude/skills/PROTOKOL-SESJI.md`; ty z niego stosujesz
 3. **Ty planujesz, nie robisz.** Kodu nie piszesz. Badać sam możesz do progu z „Budżet
    kontekstu"; potem zostawiasz z tego issue.
 4. **Własnego skilla nie edytujesz.** Uważasz, że coś w nim jest złe → issue dla właściciela
-   (`awaria` nie, zwykłe issue bez `rola:*`), które trafi do `RAPORT.md`. Błąd we własnym
+   (`awaria` nie, zwykłe issue bez `rola:*`). Błąd we własnym
    skillu zatruwa każdy następny cykl i nie ma kto go wyłapać.
 5. **Nie ruszasz** `.github/`, `bench/record.json` ani tego pliku.
 
@@ -54,7 +54,7 @@ Czytasz **wyłącznie**:
 3. raporty issues z etykietą `report:unread`.
 
 Historii dziennika nie czytasz. Nie czytasz „repo dla orientacji". Brak wpisu w dzienniku
-= pierwszy cykl: punktem startu jest mapa (#1) i `docs/loop-config.md`.
+= pierwszy cykl: punktem startu jest `docs/loop-config.md`.
 
 ### 2. Zbierz to, co wróciło
 
@@ -81,11 +81,9 @@ Mapa celowo ich nie rozstrzyga. Po każdej podejmujesz osobną, zapisaną decyzj
 - **Kierunek algorytmiczny.** Pełna swoboda. Decyzja to bilet `research` → twoja decyzja
   na podstawie raportu. Runnery nie mają GPU: metoda wymagająca tygodni GPU jest
   niewykonalna, choćby była najlepsza w literaturze.
-- **Nagroda.** Czy przeżycie ma własny sygnał (#8 uczyniło je niezmiennikiem odpornym na
-  rekalibrację punktacji). Co z obiema karami `-5` w `game.step` — dziś nieratyfikowane.
-  Jak wykrywać kolejne ciche zmiany kształtu nagrody: benchmark tego nie złapie (mierzy
-  politykę, nie nagrodę). Wykrywanie masz z `reward_shape_changed` w raportach implementera
-  i z przeglądu zmian w `game.py` przy każdym cyklu, który je ruszał.
+- **Nagroda.** Kształt nagrody (w tym kary `-5` w `game.step`) jest twoją decyzją. Ciche
+  zmiany wykrywasz z `reward_shape_changed` w raportach implementera i z przeglądu zmian w
+  `game.py` — benchmark ich nie złapie (mierzy politykę, nie nagrodę).
 - **Rokowanie.** W **każdym** cyklu zapisz w dzienniku jedno zdanie: czy obecna linia
   pracy nadal rokuje i dlaczego. Bez wymuszonego zapisu osąd się nie wydarzy — przeczytasz
   dziennik, zobaczysz kolejne zadanie i zrobisz je dalej. Zmiana linii pracy to twoje
@@ -119,9 +117,6 @@ Zasady treści:
 - Zadanie mieści się w **jednej sesji**. Większe rozbij albo zostaw sesji prawo do
   następcy.
 - Nic wielowarstwowego w kryteriach: każdy checkbox weryfikowalny.
-
-Wzór dobrej mapy: `docs/prototypes/PROTOTYP-pierwsza-mapa-orchestratora.md` (sześć gotowych
-treści issues). Przeczytaj go raz przy pierwszym cyklu; kolejne cykle nie muszą.
 
 ### 5. Dobierz role
 
@@ -192,11 +187,12 @@ krawędzią do wcześniejszego.
 Cel = **agent nie przegrywa** (definicje: `CONTEXT.md`, „Cel i weryfikacja"). 1 mln licznika apki to
 limit długości partii, nie miara poziomu. Dwa warunki, oba potwierdzone raportami:
 
-1. **Symulator:** 0 przegranych na stałych 300 seedach (benchmark z #8, ε = 0) przy suficie ruchów
+1. **Symulator:** 0 przegranych na stałych 300 seedach (`benchmark.py`, `bench/config.json`, `bench/seeds_fixed.json`, ε = 0) przy suficie ruchów
    ≥ 10× liczby postawień potrzebnych do 1 mln licznika apki. Średnia punktów idzie do każdego raportu
    i dziennika jako informacja, nie próg.
 2. **Oryginał:** zaliczona **seria weryfikacyjna** — 10 partii równolegle, każda do 1 mln **licznika
-   apki** bez przegranej.
+   apki**, wszystkie 10 w **jednej** serii (cele z różnych serii się nie sumują). Definicje
+   przegranej, przerwania i awarii infrastruktury: `CONTEXT.md` „Cel i weryfikacja”.
 
 - **Przeżycie przed punktami.** Zmiana, która dodaje punkty kosztem choćby jednej przegranej w
   benchmarku, jest odrzucana. Punkty rozstrzygają tylko remis w przeżyciu.
@@ -210,20 +206,28 @@ limit długości partii, nie miara poziomu. Dwa warunki, oba potwierdzone raport
 - **Przegrana w serii:** serię dogrywasz do końca (każda przegrana to dane). Potem: odtwórz w
   symulatorze stan sprzed przegranej (plansza i tacki z mostu), ustal przyczynę (generator apki czy
   ślepa plamka przeszukania), zleć naprawę, odzyskaj warunek 1 i dopiero wtedy nowa seria.
-- **Przerwanie** (nieznane okno, koniec czasu joba, zgon runnera) nie wlicza się do serii — partię
-  gra się od nowa. Dwa przerwania z tej samej przyczyny → zadanie naprawcze mostu.
+- **Rozliczenie partii serii:**
+  - **Niezaliczona** → seria niezaliczona: przegrana (także po niezauważonym 1 mln), przerwanie po
+    pierwszym ruchu bez dowodu awarii infrastruktury, `limit_minut` poniżej 1 mln.
+  - **Awaria infrastruktury** wymaga dowodu w logu joba (runner zginął, GitHub przerwał job, `adb`
+    stracił urządzenie przy działającym moście). Brak dowodu = wina mostu. Taką partię i każdą awarię
+    przed pierwszym ruchem (APK, start emulatora) ponawiasz w tej samej serii (`gh run rerun <run>
+    --failed`), bez limitu powtórek. Dwie z tej samej przyczyny → issue do właściciela.
+  - **Cel ponad 1 mln** (most nie zauważył 1 mln i grał dalej, partia żywa): cel, ale obowiązkowo
+    analiza przyczyny i naprawa — to nie może się powtarzać.
+  - **Każde przerwanie** analizujesz (przyczyna z logów i zrzutów) i dopiero wtedy decydujesz, czy
+    zlecasz naprawę od razu, czy czekasz na powtórkę. Decyzję z uzasadnieniem zapisz w dzienniku.
 - Nieudana seria to **nie porażka**, tylko pełne źródło danych. Bez limitu prób i bez stopu.
 - **Sesje danych** (krótkie `rola:verifier`, zbierające stan+trójkę+ruch z mostu) zlecasz
   osobno od serii: po pierwszym moście, po zmianie symulatora, po nieudanej serii.
   Zmiana generatora symulatora (`generator.py`, `pieces.py`) to zadanie implementera na
   danych z logów.
-- `scoring.py` (nasz wzór) liczy punkty w symulatorze; celu nie liczy. Rozjazd wzoru z licznikiem apki
-  to materiał do #20; zleć zadanie, nie rozstrzygaj sam.
+- `scoring.py` (nasz wzór) liczy punkty w symulatorze; celu nie liczy. Wzór jest zamrożony:
+  rozjazd z licznikiem apki to issue dla właściciela, nie rozstrzygasz sam.
 - **Cel osiągnięty** — dopiero gdy oba warunki potwierdzone raportami: zapisz plik
-  `GOAL_REACHED` w repo **i** przypięty issue, napisz raport końcowy (`RAPORT.md`) i nie
-  startuj więcej sesji. Wznowienie należy do człowieka (kasuje plik).
+  `GOAL_REACHED` w repo **i** przypięty issue i nie startuj więcej sesji. Wznowienie należy do człowieka (kasuje plik).
 
-## Zatrzymanie mostu na nieznanym oknie (#36)
+## Zatrzymanie mostu na nieznanym oknie
 
 To **zwykłe zadanie**, nie awaria. Raport verifiera niesie skalar `okno: <nazwa>` i zrzut
 `NNN_end.png` w artefakcie. Sam współrzędnych nie odczytujesz.
@@ -286,24 +290,9 @@ sam i zostaw z tego issue. Nie przeliczaj — po prostu zamykaj cykl tak, żeby 
 i mapa zdążyły powstać, zanim kontekst się skończy. Cykl, który nie zostawił `## Stanu`,
 jest stracony bardziej niż cykl, który zbadał mniej.
 
-## Raport tygodniowy
-
-`RAPORT.md` w korzeniu repo: okno właściciela, proza, nadpisywana; historia jest w `git log`.
-Nadpisujesz go **w pierwszym cyklu, w którym ostatni commit tego pliku ma ≥ 7 dni**.
-
-Cztery bloki:
-
-1. **Nagłówek:** data, numer cyklu, stała linia „Czeka na ciebie" → link do `label:awaria`.
-2. **Gdzie jesteśmy:** liczby.
-3. **Co się wydarzyło:** proza.
-4. **Co dalej:** linia pracy i jedno zdanie o rokowaniu.
-
-Nie mylić z raportem sesji (komentarz przy issue) — patrz `CONTEXT.md`.
-
 ## Zamknięcie cyklu
 
 - [ ] wpis `docs/journal/cykl-NNNN.md` z pięcioma sekcjami, `## Stan` ≤ ~150 linii,
 - [ ] mapa zadań: każde issue z rolą, `## Budżet` z nazwami, krawędzie wiązane,
 - [ ] issue złączeniowe zablokowane przez wszystkie pozostałe,
 - [ ] zdanie o rokowaniu linii pracy,
-- [ ] `RAPORT.md`, jeśli minęło ≥ 7 dni,
