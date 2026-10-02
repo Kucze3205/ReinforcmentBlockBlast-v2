@@ -38,7 +38,7 @@ MAX_GEN = 3             # limit pokoleń następców
 MAX_CONFLICTS = 3
 PROTECTED_PREFIXES = (".github/", ".claude/skills/orchestrator/")
 RECORD = "bench/record.json"
-NOTES = ("RAPORT.md", "docs/journal/")  # zapis cyklu scala się zawsze, także gdy sesja nie jest done
+NOTES = "docs/journal/"  # zapis cyklu scala się zawsze, także gdy sesja nie jest done
 ITER = "loop:iteration "                    # numer cyklu orchestratora, który założył issue; dziedziczy go następca
 
 
@@ -500,11 +500,11 @@ def merge_main(n, role, work):
 
 
 def notes_only(changed):
-    return [f for f in changed if f == NOTES[0] or f.startswith(NOTES[1])]
+    return [f for f in changed if f.startswith(NOTES)]
 
 
 def merge_notes(work):
-    """Sesja niedokończona nie scala kodu, ale jej dziennik i raport nie mogą zostać na task/N."""
+    """Sesja niedokończona nie scala kodu, ale jej dziennik nie może zostać na task/N."""
     d = os.environ.get("DEFAULT_BRANCH", "main")
     head = git(work, "rev-parse", "HEAD").stdout.strip()
     for _ in range(5):

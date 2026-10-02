@@ -332,11 +332,11 @@ class PoleWidzeniaTest(unittest.TestCase):
 
 
 class ZapisCykluTest(unittest.TestCase):
-    """Sesja niedokończona scala dziennik i raport, nigdy kod."""
+    """Sesja niedokończona scala dziennik, nigdy kod."""
 
-    def test_notes_only_przepuszcza_tylko_dziennik_i_raport(self):
-        got = loop.notes_only(["docs/journal/cykl-0003.md", "RAPORT.md", "engine.py", "docs/inne.md", ".github/loop/loop.py"])
-        self.assertEqual(got, ["docs/journal/cykl-0003.md", "RAPORT.md"])
+    def test_notes_only_przepuszcza_tylko_dziennik(self):
+        got = loop.notes_only(["docs/journal/cykl-0003.md", "engine.py", "docs/inne.md", ".github/loop/loop.py"])
+        self.assertEqual(got, ["docs/journal/cykl-0003.md"])
 
     def test_merge_notes_scala_dziennik_bez_kodu(self):
         import subprocess
