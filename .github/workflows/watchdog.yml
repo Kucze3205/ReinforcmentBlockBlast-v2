@@ -1,4 +1,4 @@
-# Dozorca (#10, #26): zegar spoza łańcucha. Sztywny skrypt, zero agenta — dozorca-sesja mogłaby paść
+# Dozorca: zegar spoza łańcucha. Sztywny skrypt, zero agenta — dozorca-sesja mogłaby paść
 # na tę samą chorobę, którą leczy. Kopie, zanim zawoła; awarię ogłasza czerwonym przebiegiem
 # (przebieg z crona mailuje do autora pliku workflow — jedyny darmowy kanał push).
 name: watchdog

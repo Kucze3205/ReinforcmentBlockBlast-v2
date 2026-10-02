@@ -1,4 +1,4 @@
-# Sesja pętli (#16). Wejście zawsze jedno: numer issue. Rola, model i budżet z etykiet + .claude/profiles.yml.
+# Sesja pętli. Wejście zawsze jedno: numer issue. Rola, model i budżet z etykiet + .claude/profiles.yml.
 # Nie wołaj wprost — wejście publiczne to dispatch.yml (walidacja, deduplikacja).
 #
 # Kod pętli (.github/loop/) biegnie z checkoutu gałęzi domyślnej (`loop/`), agent pracuje w osobnym
@@ -54,7 +54,7 @@ jobs:
       - id: guard
         run: |
           if python3 .github/loop/loop.py guard; then echo go=true >> "$GITHUB_OUTPUT"; else echo go=false >> "$GITHUB_OUTPUT"; fi
-      # martwe poświadczenie kończy job, zanim wstanie agent (#26)
+      # martwe poświadczenie kończy job, zanim wstanie agent
       - if: steps.guard.outputs.go == 'true'
         env:
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -121,7 +121,7 @@ jobs:
     needs: prep
     if: needs.prep.outputs.go == 'true' && needs.prep.outputs.kind == 'emulator'
     runs-on: ubuntu-latest
-    # job_timeout < 360: limit 6 h zabija joba jako FAILED, epilog musi zdążyć (#3)
+    # job_timeout < 360: limit 6 h zabija joba jako FAILED, epilog musi zdążyć
     timeout-minutes: ${{ fromJSON(needs.prep.outputs.job_timeout) }}
     env:
       ISSUE: ${{ inputs.issue }}

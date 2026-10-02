@@ -1,4 +1,4 @@
-# Seria weryfikacyjna (#287): 10 partii równolegle na oryginale, bez sesji agenta.
+# Seria weryfikacyjna: 10 partii równolegle na oryginale, bez sesji agenta.
 # Start: `gh workflow run seria.yml -f polityka='<spec>' -f seria=<id> [-f limit_minut=300]`.
 # Wynik partii K: artefakt `seria-<id>-partia-K` (KATALOG z pomiar.json, docs/seria-skrypt.md):
 #   gh run download <run-id> -n seria-<id>-partia-K

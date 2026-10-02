@@ -1,6 +1,6 @@
-"""Testy czystej logiki pętli (#16): raport, profile, przyczyna maszynowa, sekcje issue.
+"""Testy czystej logiki pętli: raport, profile, przyczyna maszynowa, sekcje issue.
 
-Wywołania `gh` i przebiegi Actions sprawdza dopiero bieg na sucho (#19).
+Wywołania `gh` i przebiegi Actions sprawdza dopiero bieg na sucho.
 """
 import importlib.util
 import json
@@ -206,7 +206,7 @@ class ZobowiazaniaTest(unittest.TestCase):
 
 
 class BenchTest(unittest.TestCase):
-    """Bramka „policzono" (#99) i wynik, który przeżywa pad po pomiarze (#90), na prawdziwym repo git."""
+    """Bramka „policzono" i wynik, który przeżywa pad po pomiarze, na prawdziwym repo git."""
     def setUp(self):
         self.saved = {k: getattr(loop, k) for k in ("issue",)}
         self.work = tempfile.mkdtemp()
@@ -254,7 +254,7 @@ class BenchTest(unittest.TestCase):
 
 
 class KrawedzTest(unittest.TestCase):
-    """#114: krawędź blokowania zwalnia konsumenta tylko po `done`."""
+    """Krawędź blokowania zwalnia konsumenta tylko po `done`."""
     def setUp(self):
         self.saved = {k: getattr(loop, k) for k in ("update_report", "edit_labels", "spawn_successor", "gh", "api_list", "launch")}
         self.launched, self.closed = [], []
@@ -297,7 +297,7 @@ if __name__ == "__main__":
 
 
 class PoleWidzeniaTest(unittest.TestCase):
-    """#65: pętla nie dotyka issues bez etykiety `loop:iteration N`."""
+    """Pętla nie dotyka issues bez etykiety `loop:iteration N`."""
 
     def test_loop_open_pomija_issues_bez_roli_i_pr(self):
         def lab(*names):
@@ -332,7 +332,7 @@ class PoleWidzeniaTest(unittest.TestCase):
 
 
 class ZapisCykluTest(unittest.TestCase):
-    """#66: sesja niedokończona scala dziennik i raport, nigdy kod."""
+    """Sesja niedokończona scala dziennik i raport, nigdy kod."""
 
     def test_notes_only_przepuszcza_tylko_dziennik_i_raport(self):
         got = loop.notes_only(["docs/journal/cykl-0003.md", "RAPORT.md", "engine.py", "docs/inne.md", ".github/loop/loop.py"])

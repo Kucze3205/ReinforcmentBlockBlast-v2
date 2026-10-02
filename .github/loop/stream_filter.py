@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Podgląd sesji na żywo (#69): stdin = NDJSON z `claude --output-format stream-json --verbose`.
+"""Podgląd sesji na żywo: stdin = NDJSON z `claude --output-format stream-json --verbose`.
 Log kroku jest publiczny: bez tool_result i thinking. Nigdy nie kończy się błędem i zawsze drenuje stdin
 (pad filtra = SIGPIPE dla agenta). Do $1 zapisuje stream.ndjson i claude-execution-output.json (tylko `result`,
 bo machine_cause w loop.py parsuje ten plik jako jeden obiekt JSON)."""

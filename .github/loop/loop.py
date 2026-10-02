@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Sztywny kod pętli (#16): dozór, dispatch, epilog, odblokowanie, dozorca.
+"""Sztywny kod pętli: dozór, dispatch, epilog, odblokowanie, dozorca.
 
 Zero agenta. Uruchamiany zawsze z checkoutu gałęzi domyślnej, nigdy z gałęzi
 zadania — agent nie może zmienić kodu, który go pilnuje. Leży w `.github/`, więc
-pętla nie może go edytować (zakaz 2 z #7).
+pętla nie może go edytować (zakaz 2 kontraktu pętli).
 
 Podpolecenia: guard, probe, route, resolve, export, publish, finalize, bench, watch, resume.
 """
@@ -24,21 +24,21 @@ BOT = "github-actions[bot]"
 # Pola raportu pisane wyłącznie przez epilog i dozorcę; publikacja raportu agenta ich nie kasuje.
 OWNED = ("proby", "wznow_po", "kopniecia", "kopniete", "konflikty", "przyczyna", "weryfikacja")
 AGENT_STATUSES = {"done", "partial", "blocked", "rejected"}
-MODEL_LABELS = {"model:opus": "claude-opus-5-5"}       # lista zamknięta (#13); etykietę nadaje tylko orchestrator. Nowy model = sprawdź pin CLI w session.yml (#137)
+MODEL_LABELS = {"model:opus": "claude-opus-5-5"}       # lista zamknięta; etykietę nadaje tylko orchestrator. Nowy model = sprawdź pin CLI w session.yml
 EFFORT_LABELS = {"effort:high": "high"}
 SECRETS = ("GH_TOKEN", "GITHUB_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN", "ASSETS_READ_TOKEN")
 BACKOFF_H = (1, 5, 24)                      # gdy w wyniku sesji nie ma terminu resetu limitu
-MAX_ATTEMPTS = 3        # #10: próby wznowienia
-MAX_AGE_DAYS = 30       # #10: zapadka wieku
-MAX_KICKS = 3           # #10: bezskuteczne kopnięcia
-CRASH_STREAK = 3        # #26: kolejne `crashed` bez commita
+MAX_ATTEMPTS = 3        # próby wznowienia
+MAX_AGE_DAYS = 30       # zapadka wieku
+MAX_KICKS = 3           # bezskuteczne kopnięcia
+CRASH_STREAK = 3        # kolejne `crashed` bez commita
 MAX_SLEEP_S = 340 * 60  # resume.yml: job ma limit 360 min; dłuższy park zostaje dozorcy
-GRACE_MIN = 30          # #10: karencja pokrywa opóźnienie dispatchu, nigdy czas pracy
-MAX_GEN = 3             # #7: limit pokoleń następców
+GRACE_MIN = 30          # karencja pokrywa opóźnienie dispatchu, nigdy czas pracy
+MAX_GEN = 3             # limit pokoleń następców
 MAX_CONFLICTS = 3
 PROTECTED_PREFIXES = (".github/", ".claude/skills/orchestrator/")
 RECORD = "bench/record.json"
-NOTES = ("RAPORT.md", "docs/journal/")  # zapis cyklu scala się zawsze, także gdy sesja nie jest done (#66)
+NOTES = ("RAPORT.md", "docs/journal/")  # zapis cyklu scala się zawsze, także gdy sesja nie jest done
 ITER = "loop:iteration "                    # numer cyklu orchestratora, który założył issue; dziedziczy go następca
 
 
@@ -91,7 +91,7 @@ def edit_labels(n, add=(), remove=()):
 
 
 def in_loop(names):
-    """Issue należy do pętli <=> ma `loop:iteration N` (pole widzenia) i rolę (kogo uruchomić). Sama `rola:*` nie wystarcza (#65)."""
+    """Issue należy do pętli <=> ma `loop:iteration N` (pole widzenia) i rolę (kogo uruchomić). Sama `rola:*` nie wystarcza."""
     return any(l.startswith(ITER) for l in names) and any(l.startswith("rola:") for l in names)
 
 
@@ -162,7 +162,7 @@ def set_output(**kv):
 
 
 def probe():
-    """Sonda poświadczenia (#26): 200 żyje, 401 martwy, 403 odwołany. Nie zjada limitu."""
+    """Sonda poświadczenia: 200 żyje, 401 martwy, 403 odwołany. Nie zjada limitu."""
     req = urllib.request.Request("https://api.anthropic.com/v1/models", headers={
         "Authorization": "Bearer " + os.environ.get("CLAUDE_CODE_OAUTH_TOKEN", ""),
         "anthropic-version": "2023-06-01",
@@ -255,7 +255,7 @@ def publish(n, path):
 
 
 def export(n, path):
-    """Wejście agenta: treść issue + komentarze zaufanych autorów. Agent nie sięga po `gh` (#22)."""
+    """Wejście agenta: treść issue + komentarze zaufanych autorów. Agent nie sięga po `gh`."""
     i = issue(n)
     parts = ["# Issue #%s: %s\n\n%s\n" % (n, i["title"], i["body"] or "")]
     for c in trusted_comments(n):
@@ -288,7 +288,7 @@ def frontmatter(role):
 def check_profile(role, p):
     """Zakaz 1: profil z internetem pisze wyłącznie do docs/. Zakaz 2 egzekwuje diff przy scalaniu."""
     if p.get("internet") and any(not g.startswith("docs/") for g in p.get("write", [])):
-        return "profil `%s` ma naraz internet i zapis kodu (zakaz 1 z #7)" % role
+        return "profil `%s` ma naraz internet i zapis kodu (zakaz 1 kontraktu pętli)" % role
     return None
 
 
@@ -321,7 +321,7 @@ def resolve(n):
         kind = "emulator" if p.get("emulator") else "plain"
     timeout = int(p.get("timeout_minutes", 120))
     if kind == "emulator":
-        timeout = min(timeout, 300)     # limit joba 360 min zabija go jako FAILED; epilog musi zdążyć (#3)
+        timeout = min(timeout, 300)     # limit joba 360 min zabija go jako FAILED; epilog musi zdążyć
     edit_labels(n, remove=["blocked:rate-limit", "conflict"])
     set_output(kind=kind, role=role, model=model, effort=effort, start=start,
                tools=",".join(list(p.get("tools", [])) + ["Skill"]), max_turns=p.get("max_turns", 100),
@@ -342,7 +342,7 @@ def session_runs():
 
 
 def launch(n):
-    """Jedyny sposób na start sesji: walidacja, deduplikacja, dispatch. Bez zamka: obcych odsiewa trusted() (#22)."""
+    """Jedyny sposób na start sesji: walidacja, deduplikacja, dispatch. Bez zamka: obcych odsiewa trusted()."""
     if not guard_ok():
         return False
     i = issue(n)
@@ -367,7 +367,7 @@ def unblock(closed):
 
 
 def halt_dependents(closed, status):
-    """Producent nie dowiózł (#114): konsument nie rusza na pusto, tylko zamyka się jako `blocked` (kaskadą
+    """Producent nie dowiózł: konsument nie rusza na pusto, tylko zamyka się jako `blocked` (kaskadą
     dalej). Orchestrator rusza normalnie: to on decyduje, co z niedowiezionym cyklem."""
     for d in api_list("repos/%s/issues/%s/dependencies/blocking" % (REPO, closed)):
         if d["state"] != "open":
@@ -393,7 +393,7 @@ def git(work, *args, check=True):
 
 
 def machine_cause(exec_path, exit_code):
-    """Przyczyna dosłownie z pliku wykonania, bez interpretacji. Nigdy po `subtype` (#26)."""
+    """Przyczyna dosłownie z pliku wykonania, bez interpretacji. Nigdy po `subtype`."""
     if not os.path.exists(exec_path):
         return "brak-pliku-wykonania exit=%s" % exit_code, False, None
     with open(exec_path, encoding="utf-8", errors="replace") as fh:
@@ -454,7 +454,7 @@ def run_verification(work, body):
     cmds = [c.strip() for c in cmds] or re.findall(r"`([^`\n]+)`", text)
     for c in cmds:
         r = subprocess.run(["bash", "-c", c], cwd=work, env=clean_env(), capture_output=True, text=True, timeout=3600)
-        print("$ %s\n%s%s" % (c, r.stdout, r.stderr))     # liczby z udanych poleceń zostają w logu joba (#90)
+        print("$ %s\n%s%s" % (c, r.stdout, r.stderr))     # liczby z udanych poleceń zostają w logu joba
         if r.returncode:
             return False, c + "\n" + (r.stdout + r.stderr)[-1500:]
     return True, ""
@@ -464,8 +464,8 @@ def bench(n, work):
     """`rola:bench`: job liczący bez sesji Claude'a. Polecenia bierze z `## Weryfikacja`."""
     base = git(work, "rev-parse", "HEAD").stdout.strip()
     ok, out = run_verification(work, issue(n)["body"])
-    commit_bench(n, work)   # przed oceną: wynik przeżywa polecenie, które padło po pomiarze (#90)
-    # „policzono" = bench/*.json zmienione w tym jobie, w katalogu albo w commitach poleceń (#99)
+    commit_bench(n, work)   # przed oceną: wynik przeżywa polecenie, które padło po pomiarze
+    # „policzono" = bench/*.json zmienione w tym jobie, w katalogu albo w commitach poleceń
     if ok and not git(work, "diff", "--name-only", base, "HEAD", "--", "bench/*.json").stdout.strip():
         ok, out = False, "Polecenia z `## Weryfikacja` przeszły, ale żaden bench/*.json nie przybył ani się nie zmienił: nic nie policzono."
     print(out)
@@ -622,14 +622,14 @@ def finalize(n, work):
             return
     ahead = git(work, "rev-list", "--count", "origin/%s..HEAD" % os.environ.get("DEFAULT_BRANCH", "main"), check=False).stdout.strip()
     if status != "done" and ahead not in ("", "0"):
-        # scommitowana praca nie ginie, tylko czeka: orchestrator wskazuje ją następcy (#114)
+        # scommitowana praca nie ginie, tylko czeka: orchestrator wskazuje ją następcy
         prose += ("\n\nPraca zostaje na `task/%s` (%s commitów ponad gałąź domyślną). Następca startuje z niej, "
                   "gdy ma w treści `<!-- start-branch: task/%s -->`." % (n, ahead, n))
     close_out(n, i, status, upd, prose)
 
 
 def launch_again(n):
-    # konflikt nie jest porażką zadania (#7): to samo issue, ponownie
+    # konflikt nie jest porażką zadania: to samo issue, ponownie
     launch(n)
 
 
@@ -690,7 +690,7 @@ def drive():
 
 
 def crash_streak():
-    # seria liczy się od zamknięcia ostatniej awarii: te same pady nie otwierają jej drugi raz (#137)
+    # seria liczy się od zamknięcia ostatniej awarii: te same pady nie otwierają jej drugi raz
     awarie = json.loads(gh("issue", "list", "--label", "awaria", "--state", "closed", "--json", "closedAt", "--limit", "5") or "[]")
     since = max((a["closedAt"] for a in awarie), default="")
     closed = [x for x in api_list("repos/%s/issues?state=closed&sort=updated&direction=desc&per_page=30&labels=report:unread" % REPO)
@@ -753,13 +753,13 @@ def watch_parked():
 
 
 def loop_open():
-    """Jedyne źródło issues dla dozorcy i zobowiązań: bez `loop:iteration N` pętla issue nie widzi (#65)."""
+    """Jedyne źródło issues dla dozorcy i zobowiązań: bez `loop:iteration N` pętla issue nie widzi."""
     return [x for x in api_list("repos/%s/issues?state=open" % REPO)
             if "pull_request" not in x and in_loop({l["name"] for l in x["labels"]})]
 
 
 def commitments():
-    """Pętla żyje <=> istnieje zobowiązanie: przebieg w toku, park z terminem w przyszłości, świeży dispatch (#10)."""
+    """Pętla żyje <=> istnieje zobowiązanie: przebieg w toku, park z terminem w przyszłości, świeży dispatch."""
     if LAUNCHED:
         return True
     runs = session_runs()
@@ -778,7 +778,7 @@ def commitments():
 
 
 def kick():
-    """Zator: kopnij, zanim zawołasz. Bezskuteczne kopnięcia liczy raport issue (#10)."""
+    """Zator: kopnij, zanim zawołasz. Bezskuteczne kopnięcia liczy raport issue."""
     ready = [x for x in loop_open() if is_unblocked(x["number"])
              and "blocked:rate-limit" not in label_names(x)]
     if not ready:
