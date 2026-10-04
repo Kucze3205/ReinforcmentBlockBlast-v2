@@ -2,6 +2,6 @@ __pycache__/
 *.pyc
 *.prof
 *.pth
+!weights/**/*.pth
 test_output.txt
 .vscode/
-.session/

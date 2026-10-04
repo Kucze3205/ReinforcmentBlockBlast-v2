@@ -3,7 +3,7 @@
 Kontrakt nazw między workflowami a sesjami. Workflow, który odwołuje się do nazwy
 spoza tej listy, jest błędem — nie okazją do dopisania nowej nazwy bez decyzji.
 
-Sekcje o etykietach, workflowach i ich zachowaniu powstaną z nowego projektu pętli.
+Sekcje o pozostałych workflowach powstaną razem z nimi.
 
 ---
 
@@ -109,6 +109,60 @@ nigdy przez literał `main`.
 Powód jest jeden i wystarczający: **pętla nie może edytować `.github/workflows/`**
 (akcja twardo tego zabrania). Nazwa wpisana na sztywno byłaby jedyną rzeczą, której
 pętla nie umie naprawić, umieszczoną w jedynym miejscu, którego nie umie tknąć.
+
+---
+
+## Węzeł — `wezel.yml`
+
+```bash
+gh workflow run wezel.yml -f drzewo=<t> -f wezel=<łańcuch>.<głębokość> -f kolejnosc=<n>
+```
+
+Jedna sesja agenta odkrywczego i jej rekord. Rodzicem `2.3` jest `2.2`, rodzicem `2.1`
+korzeń. Dispatch nowego węzła wymaga ocenionego rodzica. Ten sam dispatch dla węzła
+z rekordem w stanie `sesja` albo `zaparkowany` jest kontynuacją (`kolejnosc` ignorowana).
+
+| Nazwa | Co to |
+|---|---|
+| tag `korzen` | Commit bez rodzica: kod projektu, `CONTEXT.md`, `tools/`, reguły gry. Bez `.claude/`, `.github/`, `bench/` i dokumentów pętli. Każdy łańcuch startuje stąd. |
+| gałąź `trees/<t>/<łańcuch>` | Kod łańcucha. Pisze ją wyłącznie job węzła (push bez force po sesji); czubek to zawsze liść. |
+| `trees/<t>/<węzeł>.json` na gałęzi pętli | Rekord węzła (niżej). Pisze go `zapisz.sh` z ponowieniami. |
+| artefakt `transkrypt-<t>-<węzeł>-<run>-<próba>` | `stream.ndjson` sesji; z niego liczy się udział historii w oknie kontekstu. |
+
+**Budżet:** job sesji 330 min, sesja 300 min (`timeout`), `--max-turns 150`. Po każdym narzędziu
+hook dopisuje agentowi „Zostało X min sesji.”.
+
+**Co widzi agent:** checkout `work/` z jednym refem (gałąź łańcucha), bez remote'a i bez
+poświadczeń (`CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=1`, token GitHuba tylko w krokach maszynerii);
+`.historia/` (indeks, rekordy ocenionych węzłów, patche innych łańcuchów, poprzednie drzewa bez
+kodu); skill `implementer` i subagent `researcher` skopiowane do `~/.claude`. Checkout gałęzi
+pętli jest usuwany przed sesją i wraca po niej.
+
+**Po sesji** (`loop.py koniec`):
+
+| Następny krok | Kiedy | Co robi job |
+|---|---|---|
+| `park` | limit subskrypcji | `stan: zaparkowany`, `wznow_po` = reset z komunikatu albo +60 min; dispatch samego siebie, job `czekaj` śpi do `wznow_po` (dłużej niż ~5,75 h → dispatch kolejnego czekania) |
+| `kontynuuj` | `error_max_turns`, pierwszy raz | dispatch samego siebie; drugi raz → `ocena` |
+| `dziedzicz` | SHA = rodzic (nie korzeń) | `stan: oceniony`, `oceny` skopiowane od rodzica, bez oceny |
+| `ocena` | w pozostałych przypadkach | `stan: ocena w toku`; `gh workflow run ocena.yml -f wezel=<sha> -f drzewo=<t> -f id=<t>-<węzeł>` |
+
+### Rekord węzła
+
+| Pole | Pisze | Znaczenie |
+|---|---|---|
+| `rodzic`, `rodzic_sha` | węzeł | nazwa rodzica (`korzen` dla głębokości 1) i jego SHA |
+| `kolejnosc` | węzeł (z dispatchu) | kolejność utworzenia w drzewie, dla replayu |
+| `sha` | węzeł | czubek gałęzi łańcucha po sesji |
+| `stan` | węzeł, ocena | `sesja` → `zaparkowany` ↔ `sesja` → `ocena w toku` → `oceniony` (ostatnie przejście robi ocena) |
+| `gist`, `notatki` | węzeł | komunikaty commitów węzła, najnowszy pierwszy; gist = pierwsza linia najnowszego |
+| `koszt` | węzeł | `tury`, `usd`, `minuty` (czas jobów sesji od startu do zapisu, suma po kontynuacjach) |
+| `oczekiwanie_min` | węzeł, ocena | czas zaparkowania na limicie; ocena dopisuje ponowienia i naprawy |
+| `kontynuacje_tur`, `sesje` | węzeł | licznik kontynuacji po turach; lista sesji (start, koniec, tury, przyczyna) |
+| `zaparkowano`, `wznow_po` | węzeł | tylko w stanie `zaparkowany` |
+| `oceny` | ocena | `s_sym` (słownik: hash ewaluatora → wynik), `s_emu`, wyniki per partia, czas serii |
+
+Statusu „nieudany” nie ma: każdy węzeł idzie do oceny.
 
 ---
 

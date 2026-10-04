@@ -1,9 +1,6 @@
 ---
 name: implementer
 description: Poprawia wynik agenta w grze. Czyta historię dotychczasowych prób i zapisuje kolejną. Ładowany na początku sesji, przed czytaniem historii.
-model: claude-sonnet-5-5
-effort: medium
-profile: implementer
 ---
 
 # Implementer

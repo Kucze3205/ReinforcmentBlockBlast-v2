@@ -1,48 +1,24 @@
 #!/usr/bin/env python3
-"""Klocki pętli bez agenta: sonda poświadczenia, raport sesji, przyczyna maszynowa.
+"""Klocki pętli bez agenta: sonda poświadczenia, przyczyna maszynowa, rekord węzła i historia prób.
 
-Zero agenta. Uruchamiany z checkoutu gałęzi domyślnej, nigdy z gałęzi zadania —
+Zero agenta. Uruchamiany z checkoutu gałęzi domyślnej, nigdy z gałęzi łańcucha —
 agent nie może zmienić kodu, który go pilnuje.
 
-Podpolecenia: probe, export, publish.
+Podpolecenia: probe, czekaj, start, historia, koniec. Kontrakt rekordu: docs/loop-config.md.
 """
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import urllib.error
 import urllib.request
 from datetime import datetime, timedelta, timezone
 
-REPO = os.environ.get("GITHUB_REPOSITORY", "")
-MARK = "<!-- session-report -->"
-TRUSTED = {"OWNER", "MEMBER", "COLLABORATOR"}
-BOT = "github-actions[bot]"
-# Pola raportu pisane przez epilog; publikacja raportu agenta ich nie kasuje.
-OWNED = ("wznow_po", "przyczyna")
-
-
-# ---------------------------------------------------------------- gh
-
-def gh(*args, inp=None, check=True):
-    r = subprocess.run(["gh", *args], input=inp, capture_output=True, text=True)
-    if check and r.returncode:
-        raise SystemExit("gh %s: %s" % (" ".join(args[:3]), r.stderr.strip()))
-    return r.stdout
-
-
-def api(path, *fields, method="GET", inp=None):
-    args = ["api", path, "-X", method]
-    for f in fields:
-        args += ["-F", f]
-    out = gh(*args, inp=inp)
-    return json.loads(out) if out.strip() else None
-
-
-def api_list(path):
-    out = gh("api", path, "--paginate", "--jq", ".[]")
-    return [json.loads(line) for line in out.splitlines() if line.strip()]
+TREES = "trees"
+ROOT = "korzen"
+FALLBACK_PARK = timedelta(minutes=60)   # limit bez czytelnego terminu resetu: okno sesyjne ma 5 h
 
 
 def now():
@@ -53,8 +29,8 @@ def parse_time(s):
     return datetime.fromisoformat(s.replace("Z", "+00:00"))
 
 
-def issue(n):
-    return api("repos/%s/issues/%s" % (REPO, n))
+def iso(t):
+    return t.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def probe():
@@ -72,85 +48,7 @@ def probe():
         return 0    # przejściowa awaria sieci to nie martwe poświadczenie
 
 
-# ---------------------------------------------------------------- raport
-
-def trusted(c):
-    return c["author_association"] in TRUSTED or c["user"]["login"] == BOT
-
-
-def trusted_comments(n):
-    return [c for c in api_list("repos/%s/issues/%s/comments" % (REPO, n)) if trusted(c)]
-
-
-def find_report(n):
-    found = None
-    for c in trusted_comments(n):
-        if c["body"].startswith(MARK):
-            found = c
-    return found
-
-
-YAML_BLOCK = re.compile(r"```yaml\n(.*?)```", re.S)
-
-
-def fields(body):
-    m = YAML_BLOCK.search(body)
-    d = {}
-    for line in (m.group(1).splitlines() if m else []):
-        k, sep, v = line.partition(":")
-        if sep and k.strip():
-            d[k.strip()] = re.split(r"\s+#", v.strip())[0]
-    return d
-
-
-def set_fields(body, upd):
-    if not body.startswith(MARK):
-        body = MARK + "\n" + body
-    if not YAML_BLOCK.search(body):
-        body = body.replace(MARK, MARK + "\n```yaml\n```", 1)
-    m = YAML_BLOCK.search(body)
-    lines = m.group(1).splitlines()
-    for k, v in upd.items():
-        lines = [l for l in lines if l.split(":", 1)[0].strip() != k]
-        if v is not None:
-            lines.append("%s: %s" % (k, v))
-    return body[:m.start(1)] + "".join(l + "\n" for l in lines) + body[m.end(1):]
-
-
-def write_report(n, body):
-    cur = find_report(n)
-    if cur:
-        if cur["body"] != body:
-            api("repos/%s/issues/comments/%s" % (REPO, cur["id"]), "body=@-", method="PATCH", inp=body)
-    else:
-        api("repos/%s/issues/%s/comments" % (REPO, n), "body=@-", method="POST", inp=body)
-
-
-def publish(n, path):
-    """Raport agenta z pliku -> jedyny komentarz z markerem; pola epilogu przeżywają."""
-    if not os.path.exists(path):
-        return
-    with open(path, encoding="utf-8") as fh:
-        text = fh.read()
-    if not text.startswith(MARK):
-        text = MARK + "\n" + text
-    cur = find_report(n)
-    if cur:
-        keep = {k: v for k, v in fields(cur["body"]).items() if k in OWNED and k not in fields(text)}
-        text = set_fields(text, keep)
-    write_report(n, text)
-
-
-def export(n, path):
-    """Wejście agenta: treść issue + komentarze zaufanych autorów. Agent nie sięga po `gh`."""
-    i = issue(n)
-    parts = ["# Issue #%s: %s\n\n%s\n" % (n, i["title"], i["body"] or "")]
-    for c in trusted_comments(n):
-        parts.append("\n---\nkomentarz %s (%s)\n\n%s\n" % (c["id"], c["user"]["login"], c["body"]))
-    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
-    with open(path, "w", encoding="utf-8") as fh:
-        fh.write("".join(parts))
-
+# ---------------------------------------------------------------- przyczyna
 
 def machine_cause(exec_path, exit_code):
     """Przyczyna dosłownie z pliku wykonania, bez interpretacji. Nigdy po `subtype`."""
@@ -207,19 +105,221 @@ def text_reset(raw, ref=None):
     return t.astimezone(timezone.utc)
 
 
+# ---------------------------------------------------------------- rekord węzła
+
+def parent_of(node):
+    """`2.3` -> `2.2`; `2.1` -> None (rodzicem jest korzeń)."""
+    chain, depth = node.split(".")
+    return "%s.%d" % (chain, int(depth) - 1) if int(depth) > 1 else None
+
+
+def record_path(base, tree, node):
+    return os.path.join(base, TREES, str(tree), node + ".json")
+
+
+def read_json(path):
+    with open(path, encoding="utf-8") as fh:
+        return json.load(fh)
+
+
+def write_json(path, d):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8", newline="\n") as fh:
+        json.dump(d, fh, ensure_ascii=False, indent=1)
+        fh.write("\n")
+
+
+def load_tree(base, tree):
+    d = os.path.join(base, TREES, str(tree))
+    if not os.path.isdir(d):
+        return {}
+    return {f[:-5]: read_json(os.path.join(d, f)) for f in os.listdir(d) if f.endswith(".json")}
+
+
+def czekaj(rec, t):
+    """Sekundy do `wznow_po` węzła zaparkowanego na limicie; 0, gdy nie ma na co czekać."""
+    if not rec or rec.get("stan") != "zaparkowany":
+        return 0
+    return max(0, int((parse_time(rec["wznow_po"]) - t).total_seconds()))
+
+
+def start(base, tree, node, order, root_sha, t):
+    """Otwiera sesję węzła: nowy rekord albo kontynuacja (park, tury, padnięty runner). Zwraca (rekord, kontynuacja)."""
+    path = record_path(base, tree, node)
+    rec = read_json(path) if os.path.exists(path) else None
+    if rec and rec["stan"] in ("ocena w toku", "oceniony"):
+        raise SystemExit("węzeł %s/%s ma już sesję za sobą (%s)" % (tree, node, rec["stan"]))
+    if rec is None:
+        parent = parent_of(node)
+        if parent:
+            prec = read_json(record_path(base, tree, parent))
+            if prec["stan"] != "oceniony":
+                raise SystemExit("rodzic %s nieoceniony (%s)" % (parent, prec["stan"]))
+            parent_sha = prec["sha"]
+        else:
+            parent_sha = root_sha
+        rec = {"rodzic": parent or ROOT, "rodzic_sha": parent_sha, "kolejnosc": int(order),
+               "sha": parent_sha, "stan": "sesja", "gist": "", "notatki": [],
+               "koszt": {"tury": 0, "usd": 0.0, "minuty": 0.0}, "oczekiwanie_min": 0.0,
+               "kontynuacje_tur": 0, "sesje": []}
+        cont = False
+    else:
+        if rec.get("zaparkowano"):
+            rec["oczekiwanie_min"] = round(rec["oczekiwanie_min"] + (t - parse_time(rec["zaparkowano"])).total_seconds() / 60, 1)
+        rec.pop("zaparkowano", None)
+        rec.pop("wznow_po", None)
+        cont = True
+    rec["stan"] = "sesja"
+    write_json(path, rec)
+    return rec, cont
+
+
+def finish(base, tree, node, exec_path, exit_code, sha, notes, started, t):
+    """Zamyka sesję: koszt, notatki, SHA i następny krok: park | kontynuuj | dziedzicz | ocena."""
+    path = record_path(base, tree, node)
+    rec = read_json(path)
+    cause, limited, reset = machine_cause(exec_path, exit_code)
+    try:
+        result = read_json(exec_path)
+    except (OSError, ValueError):
+        result = {}
+    turns = result.get("num_turns") or 0
+    k = rec["koszt"]
+    k["tury"] += turns
+    k["usd"] = round(k["usd"] + (result.get("total_cost_usd") or 0), 4)
+    k["minuty"] = round(k["minuty"] + (t - started).total_seconds() / 60, 1)
+    rec["sesje"].append({"start": iso(started), "koniec": iso(t), "tury": turns, "przyczyna": cause or "ok"})
+    rec["sha"] = sha
+    rec["notatki"] = notes
+    rec["gist"] = notes[0].splitlines()[0] if notes else ""
+    if limited:
+        rec["stan"] = "zaparkowany"
+        rec["zaparkowano"] = iso(t)
+        rec["wznow_po"] = iso(reset if reset and reset > t else t + FALLBACK_PARK)
+        action = "park"
+    elif result.get("subtype") == "error_max_turns" and rec["kontynuacje_tur"] < 1:
+        rec["kontynuacje_tur"] += 1
+        action = "kontynuuj"
+    elif sha == rec["rodzic_sha"] and rec["rodzic"] != ROOT:
+        # bez zmian w kodzie: oceny rodzica, bez ponownej oceny
+        rec["stan"] = "oceniony"
+        rec["oceny"] = read_json(record_path(base, tree, rec["rodzic"])).get("oceny")
+        action = "dziedzicz"
+    else:
+        rec["stan"] = "ocena w toku"
+        action = "ocena"
+    write_json(path, rec)
+    return action
+
+
+def split_notes(raw):
+    """`git log --format=%B%x1e`: komunikaty commitów węzła, najnowszy pierwszy."""
+    return [n.strip() for n in raw.split("\x1e") if n.strip()]
+
+
+# ---------------------------------------------------------------- historia prób
+
+def latest(d):
+    return list(d.values())[-1] if d else None
+
+
+def s_v(rec):
+    o = rec.get("oceny") or {}
+    if o.get("s_emu") is not None:
+        return 1 + o["s_emu"]
+    return latest(o.get("s_sym") or {})
+
+
+def fmt(x):
+    return "—" if x is None else "%.3f" % x
+
+
+def table(recs):
+    lines = ["| węzeł | rodzic | s_sym | s_emu | gist |", "|---|---|---|---|---|"]
+    for name, r in sorted(recs.items(), key=lambda kv: kv[1]["kolejnosc"]):
+        o = r.get("oceny") or {}
+        lines.append("| %s | %s | %s | %s | %s |" % (name, r["rodzic"], fmt(latest(o.get("s_sym") or {})),
+                                                     fmt(o.get("s_emu")), r["gist"].replace("|", "/")))
+    return lines
+
+
+def evaluated(base, tree):
+    return {n: r for n, r in load_tree(base, tree).items() if r.get("stan") == "oceniony"}
+
+
+def historia(base, tree, node, out, diff):
+    """Rozkłada `.historia/`: indeks, rekordy ocenionych węzłów, patche innych łańcuchów (diff(sha) -> tekst)."""
+    tree = int(tree)
+    cur = evaluated(base, tree)
+    lines = ["# Indeks prób", "", "## Drzewo %d (bieżące)" % tree, ""] + table(cur)
+    for name, r in cur.items():
+        write_json(os.path.join(out, str(tree), name + ".json"), r)
+    own = node.split(".")[0]
+    leaves = {}
+    for name, r in cur.items():
+        chain, depth = name.split(".")
+        if chain != own and int(depth) > leaves.get(chain, (0, None))[0]:
+            leaves[chain] = (int(depth), r["sha"])
+    for chain, (_, sha) in leaves.items():
+        with open(os.path.join(out, str(tree), chain + ".patch"), "w", encoding="utf-8", newline="\n") as fh:
+            fh.write(diff(sha))
+    if leaves:
+        lines += ["", "Kod innych łańcuchów względem korzenia: `%d/<łańcuch>.patch`." % tree]
+    older = sorted(int(d) for d in os.listdir(os.path.join(base, TREES))
+                   if d.isdigit() and int(d) < tree) if os.path.isdir(os.path.join(base, TREES)) else []
+    if older:
+        lines += ["", "## Poprzednie drzewa", "", "| drzewo | najlepsze s_v | węzłów | indeks |", "|---|---|---|---|"]
+    for t in older:
+        recs = evaluated(base, t)
+        for name, r in recs.items():
+            write_json(os.path.join(out, str(t), name + ".json"), r)
+        with open(os.path.join(out, str(t), "INDEKS.md"), "w", encoding="utf-8", newline="\n") as fh:
+            fh.write("\n".join(["# Drzewo %d" % t, ""] + table(recs)) + "\n")
+        best = max((v for v in map(s_v, recs.values()) if v is not None), default=None)
+        lines.append("| %d | %s | %d | `%d/INDEKS.md` |" % (t, fmt(best), len(recs), t))
+    lines += ["", "Pełne rekordy (wyniki per partia, plansze przegranych, notatki): `<drzewo>/<węzeł>.json`."]
+    os.makedirs(out, exist_ok=True)
+    with open(os.path.join(out, "INDEKS.md"), "w", encoding="utf-8", newline="\n") as fh:
+        fh.write("\n".join(lines) + "\n")
+
+
+def git_diff(repo, root_sha):
+    def diff(sha):
+        return subprocess.run(["git", "-C", repo, "diff", root_sha, sha, "--", ".", ":(exclude)*.pth"],
+                              capture_output=True, text=True, check=True).stdout
+    return diff
+
+
 # ---------------------------------------------------------------- main
 
 def main(argv):
     cmd, args = argv[1], argv[2:]
+    base = os.getcwd()
     if cmd == "probe":
         code = probe()
         print("sonda: HTTP %s" % code)
         return 1 if code in (401, 403) else 0
-    if cmd == "export":
-        export(int(args[0]), args[1])
+    if cmd == "czekaj":
+        tree, node = args
+        path = record_path(base, tree, node)
+        print(czekaj(read_json(path) if os.path.exists(path) else None, now()))
         return 0
-    if cmd == "publish":
-        publish(int(args[0]), args[1])
+    if cmd == "start":
+        tree, node, order, root_sha = args
+        rec, cont = start(base, tree, node, order, root_sha, now())
+        print("RODZIC_SHA=%s\nKONTYNUACJA=%d" % (rec["rodzic_sha"], cont))
+        return 0
+    if cmd == "historia":
+        tree, node, out, root_sha = args
+        shutil.rmtree(out, ignore_errors=True)
+        historia(base, tree, node, out, git_diff(base, root_sha))
+        return 0
+    if cmd == "koniec":
+        tree, node, exec_path, exit_code, sha, notes_path, started = args
+        with open(notes_path, encoding="utf-8", errors="replace") as fh:
+            notes = split_notes(fh.read())
+        started = datetime.fromtimestamp(int(started), timezone.utc)
+        print(finish(base, tree, node, exec_path, exit_code, sha, notes, started, now()))
         return 0
     raise SystemExit("nieznane polecenie: " + cmd)
 

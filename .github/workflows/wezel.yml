@@ -1,0 +1,162 @@
+# Węzeł: jedna próba agenta odkrywczego na gałęzi łańcucha `trees/<drzewo>/<łańcuch>` i jej rekord
+# `trees/<drzewo>/<węzeł>.json` na gałęzi pętli. Ten sam dispatch wznawia węzeł zaparkowany na limicie
+# subskrypcji i kontynuuje węzeł po budżecie tur. Kontrakt rekordu: docs/loop-config.md.
+# Start: `gh workflow run wezel.yml -f drzewo=<t> -f wezel=<łańcuch>.<głębokość> -f kolejnosc=<n>`.
+name: wezel
+run-name: wezel ${{ inputs.drzewo }}/${{ inputs.wezel }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      drzewo:
+        description: Numer drzewa
+        required: true
+      wezel:
+        description: Węzeł <łańcuch>.<głębokość>
+        required: true
+      kolejnosc:
+        description: Kolejność utworzenia w drzewie (przy kontynuacji ignorowana)
+        required: true
+
+concurrency:
+  group: wezel-${{ inputs.drzewo }}-${{ inputs.wezel }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  actions: write
+
+env:
+  DRZEWO: ${{ inputs.drzewo }}
+  WEZEL: ${{ inputs.wezel }}
+  KOLEJNOSC: ${{ inputs.kolejnosc }}
+  DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+  GH_REPO: ${{ github.repository }}
+
+jobs:
+  # węzeł zaparkowany na limicie czeka tu do `wznow_po`; dłużej niż job pozwala -> dispatch samego siebie
+  czekaj:
+    if: vars.AUTOPILOT == 'on'
+    runs-on: ubuntu-latest
+    timeout-minutes: 355
+    outputs:
+      go: ${{ steps.czekaj.outputs.go }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+      - id: czekaj
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          s=$(python3 .github/loop/loop.py czekaj "$DRZEWO" "$WEZEL")
+          if [ "$s" -gt 20700 ]; then
+            sleep 20700
+            gh workflow run wezel.yml --ref "$DEFAULT_BRANCH" -f drzewo="$DRZEWO" -f wezel="$WEZEL" -f kolejnosc="$KOLEJNOSC"
+            echo go=false >> "$GITHUB_OUTPUT"
+          else
+            sleep "$s"
+            echo go=true >> "$GITHUB_OUTPUT"
+          fi
+
+  sesja:
+    needs: czekaj
+    if: needs.czekaj.outputs.go == 'true'
+    runs-on: ubuntu-latest
+    # sesja 300 min + zapas na push, rekord i dispatch; limit 6 h zabija joba bez epilogu
+    timeout-minutes: 330
+    env:
+      SESJA_MIN: 300
+      WORK: ${{ github.workspace }}/work
+    steps:
+      - run: echo "START=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          path: loop
+          fetch-depth: 0
+          persist-credentials: false
+      # martwe poświadczenie kończy job, zanim cokolwiek zapisze
+      - env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+        run: python3 loop/.github/loop/loop.py probe
+      - run: |
+          pip install -q numpy pillow matplotlib pytest
+          pip install -q torch --index-url https://download.pytorch.org/whl/cpu
+          npm install -g @anthropic-ai/claude-code@2.1.289
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config --global author.name "Kucze3205"   # pętla działa w imieniu właściciela; bot zostaje committerem
+          git config --global author.email "kuczerowski2005@gmail.com"
+      - name: Rekord, gałąź łańcucha i historia
+        id: przygotuj
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          url="https://github.com/$GITHUB_REPOSITORY"
+          GALAZ="trees/$DRZEWO/${WEZEL%%.*}"
+          KORZEN=$(git ls-remote "$url" refs/tags/korzen | cut -f1)
+          cd loop
+          python3 .github/loop/loop.py start "$DRZEWO" "$WEZEL" "$KOLEJNOSC" "$KORZEN" > "$RUNNER_TEMP/start.env"
+          . "$RUNNER_TEMP/start.env"
+          bash .github/loop/zapisz.sh "węzeł $DRZEWO/$WEZEL: sesja" "trees/$DRZEWO/$WEZEL.json"
+          git fetch -q --no-tags origin "+refs/heads/trees/$DRZEWO/*:refs/remotes/origin/trees/$DRZEWO/*"
+          python3 .github/loop/loop.py historia "$DRZEWO" "$WEZEL" "$WORK/.historia" "$KORZEN"
+          cd ..
+          # jeden ref, bez remote'a i bez poświadczeń: gałąź łańcucha albo korzeń dla nowego łańcucha
+          git init -q "$WORK"
+          git -C "$WORK" fetch -q --no-tags "$url" "+refs/heads/$GALAZ:refs/heads/$GALAZ" \
+            || git -C "$WORK" fetch -q --no-tags "$url" "+refs/tags/korzen:refs/heads/$GALAZ"
+          git -C "$WORK" checkout -q -f "$GALAZ"
+          rm -f "$WORK/.git/FETCH_HEAD"
+          echo ".historia/" >> "$WORK/.git/info/exclude"
+          if [ "$KONTYNUACJA" = 0 ] && [ "$(git -C "$WORK" rev-parse HEAD)" != "$RODZIC_SHA" ]; then
+            echo "czubek $GALAZ to nie rodzic $RODZIC_SHA"; exit 1
+          fi
+          mkdir -p ~/.claude/skills ~/.claude/agents
+          cp -r loop/.claude/skills/implementer ~/.claude/skills/
+          cp loop/.claude/agents/researcher.md ~/.claude/agents/
+          cp loop/.github/loop/agent.sh loop/.github/loop/stream_filter.py loop/.github/loop/zostalo.py "$RUNNER_TEMP/"
+          printf '{"hooks":{"PostToolUse":[{"matcher":"*","hooks":[{"type":"command","command":"python3 %s/zostalo.py"}]}]}}\n' \
+            "$RUNNER_TEMP" > "$RUNNER_TEMP/ustawienia.json"
+          cat "$RUNNER_TEMP/start.env" >> "$GITHUB_ENV"
+          echo "GALAZ=$GALAZ" >> "$GITHUB_ENV"
+          rm -rf loop
+      - name: Sesja
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+        run: bash "$RUNNER_TEMP/agent.sh"
+      - if: always() && steps.przygotuj.outcome == 'success'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          path: loop
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Gałąź, rekord i następny krok
+        if: always() && steps.przygotuj.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          git -C "$WORK" push -q "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}" "$GALAZ"
+          SHA=$(git -C "$WORK" rev-parse "$GALAZ")
+          git -C "$WORK" log --format=%B%x1e "$RODZIC_SHA..$SHA" > "$RUNNER_TEMP/notatki.txt"
+          cd loop
+          AKCJA=$(python3 .github/loop/loop.py koniec "$DRZEWO" "$WEZEL" "$RUNNER_TEMP/claude-execution-output.json" \
+            "$(cat "$RUNNER_TEMP/agent-exit" 2>/dev/null || echo brak)" "$SHA" "$RUNNER_TEMP/notatki.txt" "$START")
+          bash .github/loop/zapisz.sh "węzeł $DRZEWO/$WEZEL: $AKCJA" "trees/$DRZEWO/$WEZEL.json"
+          echo "następny krok: $AKCJA"
+          case "$AKCJA" in
+            park|kontynuuj) gh workflow run wezel.yml --ref "$DEFAULT_BRANCH" -f drzewo="$DRZEWO" -f wezel="$WEZEL" -f kolejnosc="$KOLEJNOSC" ;;
+            ocena) gh workflow run ocena.yml --ref "$DEFAULT_BRANCH" -f wezel="$SHA" -f drzewo="$DRZEWO" -f id="$DRZEWO-$WEZEL" ;;
+          esac
+      # transkrypt: z niego liczy się udział historii w oknie kontekstu
+      - if: always() && steps.przygotuj.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: transkrypt-${{ inputs.drzewo }}-${{ inputs.wezel }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/stream.ndjson
+          if-no-files-found: ignore

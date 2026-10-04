@@ -1,42 +1,15 @@
-"""Testy czystej logiki klocków pętli: raport i przyczyna maszynowa."""
+"""Testy czystej logiki klocków pętli: przyczyna maszynowa, rekord węzła i historia prób."""
 import importlib.util
 import json
 import os
 import tempfile
 import unittest
+from datetime import timedelta
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 spec = importlib.util.spec_from_file_location("loop", os.path.join(ROOT, ".github", "loop", "loop.py"))
 loop = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(loop)
-
-REPORT = loop.MARK + "\n```yaml\nstatus: done\ncommit: 9f3c1ab\n```\nProza.\n\n## Co dalej\n- nic\n"
-
-
-class RaportTest(unittest.TestCase):
-    def test_fields_czyta_skalary(self):
-        self.assertEqual(loop.fields(REPORT), {"status": "done", "commit": "9f3c1ab"})
-
-    def test_fields_obcina_komentarz_w_linii(self):
-        self.assertEqual(loop.fields("```yaml\nreward_shape_changed: yes   # albo no\n```")["reward_shape_changed"], "yes")
-
-    def test_set_fields_nadpisuje_dopisuje_i_kasuje(self):
-        b = loop.set_fields(REPORT, {"status": "partial", "proby": 2, "commit": None})
-        self.assertEqual(loop.fields(b), {"status": "partial", "proby": "2"})
-        self.assertIn("## Co dalej", b)
-        self.assertTrue(b.startswith(loop.MARK))
-
-    def test_set_fields_zaklada_blok_gdy_brak(self):
-        b = loop.set_fields("Sama proza.\n", {"status": "crashed"})
-        self.assertEqual(loop.fields(b), {"status": "crashed"})
-        self.assertIn("Sama proza.", b)
-
-    def test_zaufanie_do_autora(self):
-        self.assertTrue(loop.trusted({"author_association": "OWNER", "user": {"login": "x"}}))
-        self.assertTrue(loop.trusted({"author_association": "NONE", "user": {"login": "github-actions[bot]"}}))
-        self.assertFalse(loop.trusted({"author_association": "NONE", "user": {"login": "obcy"}}))
-        self.assertFalse(loop.trusted({"author_association": "CONTRIBUTOR", "user": {"login": "obcy"}}))
-
 
 class PrzyczynaTest(unittest.TestCase):
     def cause(self, payload, exit_code="0"):
@@ -83,6 +56,129 @@ class PrzyczynaTest(unittest.TestCase):
         c, limited, _ = loop.machine_cause("/nie/ma/takiego.json", "1")
         self.assertIn("brak-pliku-wykonania", c)
         self.assertFalse(limited)
+
+T0 = loop.parse_time("2026-10-05T10:00:00Z")
+
+
+class Drzewo(unittest.TestCase):
+    def setUp(self):
+        self.base = tempfile.mkdtemp()
+
+    def rec(self, node):
+        return loop.read_json(loop.record_path(self.base, 1, node))
+
+    def wynik(self, payload):
+        p = os.path.join(self.base, "wynik.json")
+        with open(p, "w", encoding="utf-8") as fh:
+            json.dump(payload, fh)
+        return p
+
+    def oceniony(self, node, sha, s_sym=None, s_emu=None, gist="g", tree=1):
+        parent = loop.parent_of(node)
+        loop.write_json(loop.record_path(self.base, tree, node), {
+            "rodzic": parent or "korzen", "rodzic_sha": "x", "kolejnosc": int(node.split(".")[1]) * 10 + int(node.split(".")[0]),
+            "sha": sha, "stan": "oceniony", "gist": gist, "notatki": [gist],
+            "oceny": {"s_sym": {"h1": 0.1, "h2": s_sym}, "s_emu": s_emu}})
+
+
+class RekordTest(Drzewo):
+    def test_rodzic(self):
+        self.assertEqual(loop.parent_of("2.3"), "2.2")
+        self.assertIsNone(loop.parent_of("2.1"))
+
+    def test_nowy_wezel_od_korzenia(self):
+        rec, cont = loop.start(self.base, 1, "1.1", 3, "K", T0)
+        self.assertFalse(cont)
+        self.assertEqual((rec["rodzic"], rec["rodzic_sha"], rec["kolejnosc"], rec["stan"]), ("korzen", "K", 3, "sesja"))
+
+    def test_nowy_wezel_od_ocenionego_rodzica(self):
+        self.oceniony("1.1", "A")
+        rec, _ = loop.start(self.base, 1, "1.2", 5, "K", T0)
+        self.assertEqual((rec["rodzic"], rec["rodzic_sha"]), ("1.1", "A"))
+
+    def test_rodzic_nieoceniony_blokuje(self):
+        loop.start(self.base, 1, "1.1", 1, "K", T0)
+        with self.assertRaises(SystemExit):
+            loop.start(self.base, 1, "1.2", 2, "K", T0)
+
+    def test_skonczony_wezel_nie_rusza_drugi_raz(self):
+        self.oceniony("1.1", "A")
+        with self.assertRaises(SystemExit):
+            loop.start(self.base, 1, "1.1", 1, "K", T0)
+
+    def test_koniec_do_oceny_z_kosztem_i_notatkami(self):
+        loop.start(self.base, 1, "1.1", 1, "K", T0)
+        a = loop.finish(self.base, 1, "1.1", self.wynik({"subtype": "success", "num_turns": 40, "total_cost_usd": 1.5}),
+                        "0", "B", ["Sedno\n\nCo dalej: nic", "starsza"], T0, T0 + timedelta(minutes=90))
+        r = self.rec("1.1")
+        self.assertEqual(a, "ocena")
+        self.assertEqual((r["stan"], r["sha"], r["gist"]), ("ocena w toku", "B", "Sedno"))
+        self.assertEqual(r["koszt"], {"tury": 40, "usd": 1.5, "minuty": 90.0})
+        self.assertEqual(r["sesje"][0]["przyczyna"], "ok")
+
+    def test_limit_parkuje_a_wznowienie_liczy_oczekiwanie(self):
+        loop.start(self.base, 1, "1.1", 1, "K", T0)
+        a = loop.finish(self.base, 1, "1.1", self.wynik({"is_error": True, "result": "You've hit your session limit · resets 1pm (UTC)"}),
+                        "1", "B", [], T0, T0 + timedelta(minutes=30))
+        r = self.rec("1.1")
+        self.assertEqual((a, r["stan"], r["wznow_po"]), ("park", "zaparkowany", "2026-10-05T13:00:00Z"))
+        self.assertEqual(loop.czekaj(r, T0 + timedelta(hours=2)), 3600)
+        rec, cont = loop.start(self.base, 1, "1.1", 1, "K", T0 + timedelta(hours=3))
+        self.assertTrue(cont)
+        self.assertEqual((rec["stan"], rec["oczekiwanie_min"]), ("sesja", 150.0))
+        self.assertNotIn("wznow_po", rec)
+        self.assertEqual(loop.czekaj(rec, T0), 0)
+
+    def test_limit_bez_terminu_czeka_godzine(self):
+        loop.start(self.base, 1, "1.1", 1, "K", T0)
+        loop.finish(self.base, 1, "1.1", self.wynik({"is_error": True, "result": "You've hit your weekly limit"}), "1", "K", [], T0, T0)
+        self.assertEqual(self.rec("1.1")["wznow_po"], "2026-10-05T11:00:00Z")
+
+    def test_budzet_tur_daje_jedna_kontynuacje(self):
+        loop.start(self.base, 1, "1.1", 1, "K", T0)
+        tury = self.wynik({"subtype": "error_max_turns", "num_turns": 150})
+        self.assertEqual(loop.finish(self.base, 1, "1.1", tury, "1", "B", [], T0, T0), "kontynuuj")
+        loop.start(self.base, 1, "1.1", 1, "K", T0)
+        self.assertEqual(loop.finish(self.base, 1, "1.1", tury, "1", "C", [], T0, T0), "ocena")
+        self.assertEqual(self.rec("1.1")["koszt"]["tury"], 300)
+
+    def test_bez_zmian_dziedziczy_oceny_rodzica(self):
+        self.oceniony("1.1", "A", s_sym=0.5)
+        loop.start(self.base, 1, "1.2", 2, "K", T0)
+        self.assertEqual(loop.finish(self.base, 1, "1.2", self.wynik({"subtype": "success"}), "0", "A", [], T0, T0), "dziedzicz")
+        r = self.rec("1.2")
+        self.assertEqual((r["stan"], r["oceny"]["s_sym"]["h2"]), ("oceniony", 0.5))
+
+    def test_korzen_bez_zmian_idzie_do_oceny(self):
+        loop.start(self.base, 1, "1.1", 1, "K", T0)
+        self.assertEqual(loop.finish(self.base, 1, "1.1", self.wynik({"subtype": "success"}), "0", "K", [], T0, T0), "ocena")
+
+    def test_notatki_z_logu(self):
+        self.assertEqual(loop.split_notes("Nowa\n\nciało\n\x1e\nStara\n\x1e\n"), ["Nowa\n\nciało", "Stara"])
+
+
+class HistoriaTest(Drzewo):
+    def test_indeks_rekordy_patche_i_poprzednie_drzewa(self):
+        self.oceniony("1.1", "P", s_sym=0.4, tree=1)
+        self.oceniony("2.1", "Q", s_emu=0.7, tree=1)
+        self.oceniony("1.1", "A", s_sym=0.5, gist="a|b", tree=2)
+        self.oceniony("1.2", "A2", s_sym=0.6, tree=2)
+        self.oceniony("2.1", "B", s_sym=0.2, tree=2)
+        self.oceniony("2.2", "B2", s_emu=0.3, tree=2)
+        loop.write_json(loop.record_path(self.base, 2, "3.1"), {"stan": "ocena w toku", "kolejnosc": 99})
+        out = os.path.join(self.base, ".historia")
+        loop.historia(self.base, 2, "1.3", out, lambda sha: "patch " + sha)
+        with open(os.path.join(out, "INDEKS.md"), encoding="utf-8") as fh:
+            idx = fh.read()
+        self.assertIn("| 1.1 | korzen | 0.500 | — | a/b |", idx)
+        self.assertIn("| 2.2 | 2.1 | — | 0.300 | g |", idx)
+        self.assertNotIn("3.1", idx)
+        self.assertIn("| 1 | 1.700 | 2 | `1/INDEKS.md` |", idx)
+        with open(os.path.join(out, "2", "2.patch"), encoding="utf-8") as fh:
+            self.assertEqual(fh.read(), "patch B2")
+        self.assertFalse(os.path.exists(os.path.join(out, "2", "1.patch")))
+        self.assertTrue(os.path.exists(os.path.join(out, "1", "INDEKS.md")))
+        self.assertEqual(loop.read_json(os.path.join(out, "1", "2.1.json"))["sha"], "Q")
 
 
 if __name__ == "__main__":

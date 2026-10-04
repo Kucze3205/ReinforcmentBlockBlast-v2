@@ -1,35 +1,34 @@
 #!/usr/bin/env bash
-# Sesja agenta. Uruchamiana z checkoutu gałęzi domyślnej; agent pracuje w $WORK.
-# Wejście: .session/issue.md (przefiltrowane). Wyjście: .session/report.md (publikuje workflow).
-# Agent nie ma `gh` ani internetu z profilu: raport i wejście idą plikami.
+# Sesja agenta odkrywczego. Agent pracuje w $WORK na gałęzi łańcucha (jedyny ref, bez remote'a);
+# historia prób leży w $WORK/.historia, skill i subagent w ~/.claude, hook czasu w $RUNNER_TEMP.
+# Checkoutu gałęzi pętli w tym czasie na dysku nie ma.
 set -u
-LOOP="$GITHUB_WORKSPACE/loop/.github/loop/loop.py"
-OUT="${RUNNER_TEMP:-/tmp}"
+OUT="$RUNNER_TEMP"
 cd "$WORK" || exit 1
-git config user.name "github-actions[bot]"
-git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-git checkout -q -B "task/$ISSUE"
-mkdir -p .session
-GH_TOKEN="$LOOP_GH_TOKEN" python3 "$LOOP" export "$ISSUE" .session/issue.md
 
-# checkpoint: raport i gałąź jadą na zewnątrz, zanim runner zginie
-( while sleep 120; do
-    GH_TOKEN="$LOOP_GH_TOKEN" python3 "$LOOP" publish "$ISSUE" .session/report.md
-    git push -q -f origin "HEAD:refs/heads/task/$ISSUE"
-  done ) >/dev/null 2>&1 &
-SYNC=$!
+PROMPT="Wywołaj skill \`implementer\` narzędziem Skill i popraw wynik agenta w grze. Historia prób: .historia/INDEKS.md. Pracujesz na gałęzi $GALAZ; commituj często."
+if [ "$KONTYNUACJA" = 1 ]; then
+  PROMPT="$PROMPT To kontynuacja przerwanej próby: jej dotychczasowe commity to \`git log -p $RODZIC_SHA..HEAD\`."
+fi
 
-PROMPT="Jesteś rolą \`$ROLE\` w pętli. Wywołaj skill \`$ROLE\` narzędziem Skill i wykonaj zadanie z issue #$ISSUE. Wejście: .session/issue.md. Raport zapisz w .session/report.md. Pracujesz na gałęzi task/$ISSUE; commituj często."
-# koniec tury w -p to koniec sesji: praca w tle i Monitor giną z runnerem: zdarzyło się, że sesja skończyła turę na „wrócę, gdy policzy"
+# koniec tury w -p to koniec sesji: praca w tle ginie z runnerem
 export CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1
-# długie liczenie na pierwszym planie: domyślnie Bash ucina po 2 min (maks. 10), pokolenie CEM trwa ~11 min
-export BASH_DEFAULT_TIMEOUT_MS=$((AGENT_TIMEOUT * 60000)) BASH_MAX_TIMEOUT_MS=$((AGENT_TIMEOUT * 60000))
-timeout "${AGENT_TIMEOUT}m" claude -p "$PROMPT" \
-  --model "$MODEL" --effort "$EFFORT" \
-  --permission-mode acceptEdits --allowedTools "$TOOLS" --disallowedTools Monitor \
-  --max-turns "$MAX_TURNS" --output-format stream-json --verbose \
+# poświadczenie zostaje w procesie Claude Code, znika z Basha i hooków
+export CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=1
+# przeciążenia API (429/529) ponawiane zamiast końca sesji; limit subskrypcji i tak kończy sesję
+export CLAUDE_CODE_RETRY_WATCHDOG=1
+# trening na pierwszym planie: domyślnie Bash ucina po 2 min
+export BASH_DEFAULT_TIMEOUT_MS=$((SESJA_MIN * 60000)) BASH_MAX_TIMEOUT_MS=$((SESJA_MIN * 60000))
+export KONIEC=$(( $(date +%s) + SESJA_MIN * 60 ))
+
+timeout "${SESJA_MIN}m" claude -p "$PROMPT" \
+  --model claude-sonnet-5-5 --effort medium \
+  --permission-mode acceptEdits \
+  --allowedTools "Read,Glob,Grep,Skill,Agent,WebSearch,WebFetch,Bash(git *),Bash(python *),Bash(python3 *),Bash(pytest *),Bash(pip install *)" \
+  --disallowedTools Monitor \
+  --settings "$OUT/ustawienia.json" \
+  --max-turns 150 --output-format stream-json --verbose \
   2> "$OUT/claude-stderr.txt" \
-  | python3 "$GITHUB_WORKSPACE/loop/.github/loop/stream_filter.py" "$OUT"
+  | python3 "$OUT/stream_filter.py" "$OUT"
 echo "${PIPESTATUS[0]}" > "$OUT/agent-exit"
-kill "$SYNC" 2>/dev/null
 exit 0
