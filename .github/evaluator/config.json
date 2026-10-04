@@ -8,5 +8,22 @@
   "tylko_do_odczytu": {
     "sym": ["board.py", "game.py", "generator.py", "pieces.py", "scoring.py"],
     "most": ["bridge.py", "tools/bridge.sh"]
+  },
+  "kalibracja": {
+    "tempo": 0.15,
+    "chi2_p": 0.01,
+    "min_pary": 20,
+    "min_klockow": 60,
+    "nieznane_max": 0.02,
+    "max_delta": 20000,
+    "wzorzec_tacek": 60000,
+    "odcinek_ruchy": 150,
+    "zestaw_ruchy": 300,
+    "ponowienia": 3,
+    "iteracje": 3,
+    "iteracja_min": 60
+  },
+  "utrzymanie": {
+    "dodatkowe": ["tests/test_engine.py", "tests/test_bridge.py"]
   }
 }

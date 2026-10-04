@@ -1,8 +1,9 @@
 # Ocena jednego węzła: symulator (shardy) -> próg (0 przegranych) -> seria na emulatorze -> zliczenie.
 # Start: `gh workflow run ocena.yml -f wezel=<sha> -f drzewo=<t> -f id=<nazwa> [-f partie='[3,7]']`
 # Wynik: artefakt `ocena-<id>` z ocena.json (format i zasady: .github/evaluator/ocena.py).
-# Powtórka przerwanych partii: ten sam węzeł z `partie` = brakujące numery, a wynik scala
-#   python3 .github/evaluator/ocena.py zlicz --drzewo <t> --poprzednia <stary ocena.json> ...
+# Powtórka przerwanych partii: ten sam węzeł z `partie` = brakujące numery; ważne partie z poprzednich przebiegów
+# bierze z rekordu węzła (`oceny.emu`). Po serii: rozjazd symulatora względem logów mostu, ponowienie po awarii
+# infrastruktury albo utrzymanie ewaluatora (kalibracja.py wyzwalacz); naprawa wstrzymuje serie (trees/utrzymanie.json).
 name: ocena
 run-name: ocena ${{ inputs.id }}
 
@@ -21,6 +22,9 @@ on:
       partie:
         description: Numery partii serii do zagrania (JSON); domyślnie wszystkie
         default: "[1,2,3,4,5,6,7,8,9,10]"
+      proba:
+        description: Numer próby serii (ponowienia po awarii infrastruktury liczy sam przebieg)
+        default: "1"
 
 permissions:
   contents: read
@@ -78,9 +82,37 @@ jobs:
           python3 .github/evaluator/ocena.py zlicz --drzewo "${{ inputs.drzewo }}" --sym sym --out ocena.json
           echo "seria=$(jq -r .potrzebna_seria ocena.json)" >> "$GITHUB_OUTPUT"
 
-  seria:
+  # naprawa ewaluatora zatrzymuje serie (znacznik trees/utrzymanie.json): czekamy, aż zniknie; po nieudanej
+  # naprawie znacznik zostaje do decyzji właściciela, a węzeł zostaje w stanie `ocena w toku`
+  emulator:
     needs: prog
     if: ${{ needs.prog.outputs.seria == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    outputs:
+      seria: ${{ steps.s.outputs.seria }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - id: s
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          for i in $(seq 1 66); do
+            git fetch -q origin "$DEFAULT_BRANCH"
+            stan=$(git show "origin/$DEFAULT_BRANCH:trees/utrzymanie.json" 2>/dev/null | jq -r .stan || true)
+            case "$stan" in
+              "") echo seria=tak >> "$GITHUB_OUTPUT"; exit 0 ;;
+              naprawa) sleep 300 ;;
+              *) echo "serie wstrzymane: $stan"; echo seria=nie >> "$GITHUB_OUTPUT"; exit 0 ;;
+            esac
+          done
+          echo "naprawa trwa dłużej niż ocena może czekać"; echo seria=nie >> "$GITHUB_OUTPUT"
+
+  seria:
+    needs: [prog, emulator]
+    if: ${{ needs.prog.outputs.seria == 'true' && needs.emulator.outputs.seria == 'tak' }}
     concurrency:
       group: seria
       cancel-in-progress: false
@@ -92,7 +124,7 @@ jobs:
     secrets: inherit
 
   wynik:
-    needs: [prog, seria]
+    needs: [prog, emulator, seria]
     if: ${{ !cancelled() && needs.prog.result == 'success' }}
     runs-on: ubuntu-latest
     permissions:
@@ -111,9 +143,19 @@ jobs:
           pattern: seria-${{ inputs.id }}-partia-*
           path: seria
       - name: Zlicz ocenę
+        env:
+          DRZEWO: ${{ inputs.drzewo }}
+          ID: ${{ inputs.id }}
         run: |
-          python3 .github/evaluator/ocena.py zlicz --drzewo "${{ inputs.drzewo }}" --wezel "${{ inputs.wezel }}" \
-            --sym sym --seria seria --out ocena.json --podsumowanie "$GITHUB_STEP_SUMMARY"
+          WEZEL=${ID#"$DRZEWO"-}
+          PREV=""
+          # ponowienie: ważne partie z wcześniejszych przebiegów leżą w rekordzie węzła
+          if [ -f "trees/$DRZEWO/$WEZEL.json" ] && jq -e '.oceny.emu' "trees/$DRZEWO/$WEZEL.json" > /dev/null; then
+            jq '{emu: .oceny.emu}' "trees/$DRZEWO/$WEZEL.json" > prev.json
+            PREV="--poprzednia prev.json"
+          fi
+          python3 .github/evaluator/ocena.py zlicz --drzewo "$DRZEWO" --wezel "${{ inputs.wezel }}" \
+            --sym sym --seria seria --out ocena.json --podsumowanie "$GITHUB_STEP_SUMMARY" $PREV
           python3 .github/evaluator/ocena.py bramka ocena.json || true
       - uses: actions/upload-artifact@v4
         with:
@@ -140,3 +182,45 @@ jobs:
           if [ "$(jq -r .stan "trees/$DRZEWO/$WEZEL.json")" = oceniony ]; then
             gh workflow run drzewo.yml --ref "$DEFAULT_BRANCH" -f drzewo="$DRZEWO"
           fi
+      # po serii: rozjazd symulatora względem jej logów, ponowienie po awarii infrastruktury albo utrzymanie
+      - name: Rozjazd symulatora względem logów serii
+        if: ${{ needs.seria.result != 'skipped' }}
+        env:
+          PROBA: ${{ inputs.proba }}
+        run: |
+          set -u
+          python3 .github/evaluator/kalibracja.py rozjazd --seria seria --out rozjazd.json --podsumowanie "$GITHUB_STEP_SUMMARY" || true
+          [ -f rozjazd.json ] || echo '{"ok": false}' > rozjazd.json
+          AKCJA=$(python3 .github/evaluator/kalibracja.py wyzwalacz --seria seria --rozjazd rozjazd.json --proba "${PROBA:-1}")
+          echo "AKCJA=$AKCJA" >> "$GITHUB_ENV"
+          echo "wyzwalacz: $AKCJA"
+      - uses: actions/upload-artifact@v4
+        if: ${{ needs.seria.result != 'skipped' }}
+        with:
+          name: rozjazd-${{ inputs.id }}
+          path: rozjazd.json
+      - name: Ponowienie albo utrzymanie
+        if: ${{ needs.seria.result != 'skipped' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          WEZEL_SHA: ${{ inputs.wezel }}
+          DRZEWO: ${{ inputs.drzewo }}
+          ID: ${{ inputs.id }}
+          PROBA: ${{ inputs.proba }}
+        run: |
+          set -eu
+          case "$AKCJA" in
+            ponow*)
+              gh workflow run ocena.yml --ref "$DEFAULT_BRANCH" -f wezel="$WEZEL_SHA" -f drzewo="$DRZEWO" -f id="$ID" \
+                -f partie="${AKCJA#ponow }" -f proba="$((${PROBA:-1} + 1))" ;;
+            utrzymanie*)
+              POWOD=${AKCJA#utrzymanie }
+              if [ "$POWOD" = rozjazd ]; then
+                # logi serii z rozjazdem są częścią zestawu kontrolnego, przy którym naprawa ma przejść
+                python3 .github/evaluator/kalibracja.py zestaw --seria seria --nazwa "$ID"
+                bash .github/loop/zapisz.sh "zestaw kontrolny: rozjazd w serii $ID" .github/evaluator/kalibracja/zestaw
+              fi
+              gh workflow run utrzymanie.yml --ref "$DEFAULT_BRANCH" -f powod="$POWOD" -f id="$ID" -f run="$GITHUB_RUN_ID" ;;
+          esac

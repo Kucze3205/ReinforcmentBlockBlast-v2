@@ -26,7 +26,10 @@ def config(base):
 
 def load_policy(base):
     """Moduł polityki i skrót jego treści (polityka jest przypięta na całe drzewo)."""
-    path = os.path.join(base, POLICY)
+    return load_file(os.path.join(base, POLICY))
+
+
+def load_file(path):
     with open(path, "rb") as fh:
         digest = hashlib.sha256(fh.read()).hexdigest()[:12]
     spec = importlib.util.spec_from_file_location("policy", path)
@@ -60,16 +63,18 @@ def obserwacje(recs, baseline):
 class Pytanie:
     """Widok drzewa dla polityki: tylko ujawniony prefiks, nic o trybie."""
 
-    def __init__(self, obs, W, K, runda, baseline):
+    def __init__(self, obs, W, K, runda, baseline, zamkniete=()):
         self.max_parallelism, self.max_rounds, self.round, self.baseline_score = W, K, runda, baseline
         self._obs = obs
+        self._closed = set(zamkniete)   # łańcuchy bez dalszego ciągu (tylko odtwarzanie): bez akcji, obserwacje zostają
 
     def observed(self):
         return [dict(o) for o in self._obs]
 
     def legal_actions(self):
         """`None` (nowy łańcuch od korzenia) i czubki łańcuchów."""
-        return [None] + list({o["lancuch"]: o["wezel"] for o in self._obs}.values())
+        tips = {o["lancuch"]: o["wezel"] for o in self._obs if o["lancuch"] not in self._closed}
+        return [None] + list(tips.values())
 
 
 def paczka(wyjscie, pytanie):
@@ -144,7 +149,7 @@ def next_tree(base):
 
 
 def baseline(base):
-    """`trees/baseline.json` (`{"s_v": x}`) pisze faza 0; bez niego baseline to 0."""
+    """`trees/baseline.json` (`{"s_v": x}`) to opcjonalny zapis ręczny; bez niego baseline to 0."""
     p = os.path.join(base, loop.TREES, "baseline.json")
     return loop.read_json(p)["s_v"] if os.path.exists(p) else 0.0
 

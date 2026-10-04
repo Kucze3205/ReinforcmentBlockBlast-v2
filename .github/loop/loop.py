@@ -4,7 +4,7 @@
 Zero agenta. Uruchamiany z checkoutu gałęzi domyślnej, nigdy z gałęzi łańcucha —
 agent nie może zmienić kodu, który go pilnuje.
 
-Podpolecenia: probe, czekaj, start, historia, koniec. Kontrakt rekordu: docs/loop-config.md.
+Podpolecenia: probe, limit, czekaj, start, historia, koniec. Kontrakt rekordu: docs/loop-config.md.
 """
 import json
 import os
@@ -103,6 +103,14 @@ def text_reset(raw, ref=None):
     elif t <= ref:
         t += timedelta(days=1)
     return t.astimezone(timezone.utc)
+
+
+def limit_s(exec_path, exit_code, t):
+    """Sekundy do końca limitu subskrypcji po sesji; 0, gdy sesja nie padła na limicie."""
+    _, limited, reset = machine_cause(exec_path, exit_code)
+    if not limited:
+        return 0
+    return max(60, int(((reset if reset and reset > t else t + FALLBACK_PARK) - t).total_seconds()))
 
 
 # ---------------------------------------------------------------- rekord węzła
@@ -299,6 +307,10 @@ def main(argv):
         code = probe()
         print("sonda: HTTP %s" % code)
         return 1 if code in (401, 403) else 0
+    if cmd == "limit":
+        exec_path, exit_code = args
+        print(limit_s(exec_path, exit_code, now()))
+        return 0
     if cmd == "czekaj":
         tree, node = args
         path = record_path(base, tree, node)

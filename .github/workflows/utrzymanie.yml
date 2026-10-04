@@ -1,0 +1,248 @@
+# Utrzymanie ewaluatora: agent naprawia most i kalibruje symulator (do 3 iteracji "sesja -> sprawdzenie"
+# na emulatorze), a po przejściu bramki job scala naprawę na gałąź domyślną. Po 3 nieudanych iteracjach
+# zakłada issue dla właściciela i zostawia serie na emulatorze wstrzymane (trees/utrzymanie.json).
+# Wyzwalają je ocena.yml (rozjazd, przerwanie mostu) i faza0.yml; kontrakt: docs/loop-config.md.
+#   gh workflow run utrzymanie.yml -f powod=<faza0|most|rozjazd> -f id=<seria> -f run=<przebieg z artefaktami>
+name: utrzymanie
+run-name: utrzymanie ${{ inputs.powod }} ${{ inputs.id }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      powod:
+        description: faza0 | most | rozjazd
+        required: true
+      id:
+        description: Identyfikator serii, która otworzyła zadanie (artefakty seria-<id>-partia-*, rozjazd-<id>)
+        required: true
+      run:
+        description: Numer przebiegu z tymi artefaktami
+        required: true
+
+# jedna naprawa naraz; kolejny wyzwalacz w trakcie naprawy widzi znacznik i nic nie robi
+concurrency:
+  group: utrzymanie
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  actions: write
+  issues: write
+
+env:
+  POWOD: ${{ inputs.powod }}
+  ID: ${{ inputs.id }}
+  DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+  GH_REPO: ${{ github.repository }}
+
+jobs:
+  warunek:
+    if: vars.AUTOPILOT == 'on'
+    runs-on: ubuntu-latest
+    outputs:
+      idz: ${{ steps.w.outputs.idz }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+      # znacznik jest, gdy naprawa trwa albo czeka na właściciela: wtedy nowy wyzwalacz nic nie zmienia
+      - id: w
+        run: |
+          if [ -f trees/utrzymanie.json ]; then echo idz=nie >> "$GITHUB_OUTPUT"; cat trees/utrzymanie.json
+          else echo idz=tak >> "$GITHUB_OUTPUT"; fi
+
+  naprawa:
+    needs: warunek
+    if: needs.warunek.outputs.idz == 'tak'
+    runs-on: ubuntu-latest
+    # 3 iteracje po 60 min sesji + sprawdzenia (po ok. 12 min) + limit subskrypcji; limit 6 h zabija joba bez epilogu
+    timeout-minutes: 355
+    env:
+      ITERACJE: 3
+      ITERACJA_MIN: 60
+      WORK: ${{ github.workspace }}/work
+    steps:
+      # kontekst `runner` nie istnieje w env joba
+      - run: |
+          echo "ZAUFANE=$RUNNER_TEMP/zaufane" >> "$GITHUB_ENV"
+          echo "WYNIK=$RUNNER_TEMP/wynik" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          path: loop
+          fetch-depth: 0
+          persist-credentials: false
+      # martwe poświadczenie kończy job, zanim cokolwiek zapisze
+      - env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+        run: python3 loop/.github/loop/loop.py probe
+      - name: Wstrzymaj serie na emulatorze
+        id: wstrzymaj
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          cd loop
+          mkdir -p trees
+          printf '{"stan":"naprawa","powod":"%s","id":"%s","od":"%s"}\n' "$POWOD" "$ID" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > trees/utrzymanie.json
+          bash .github/loop/zapisz.sh "utrzymanie: serie na emulatorze wstrzymane na czas naprawy" trees/utrzymanie.json
+      - name: Dane serii, która otworzyła zadanie
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          pattern: "{seria,rozjazd}-${{ inputs.id }}*"
+          run-id: ${{ inputs.run }}
+          github-token: ${{ github.token }}
+          path: dane
+      - name: Katalog roboczy agenta i zaufane kopie
+        env:
+          ASSETS_READ_TOKEN: ${{ secrets.ASSETS_READ_TOKEN }}
+        run: |
+          set -eu
+          mkdir -p "$ZAUFANE" "$WYNIK"
+          cp -r loop/.github "$ZAUFANE/.github"
+          # agent dostaje kod projektu i ewaluatora: bez maszynerii pętli, dokumentów, rekordów i historii gita
+          mkdir "$WORK"
+          git -C loop archive HEAD | tar -x -C "$WORK"
+          rm -rf "$WORK"/{.github/workflows,.github/loop,.github/policy,docs,trees,.claude,bench,README.md,.gitattributes}
+          rm -f "$WORK"/tests/test_{evaluator,loop,drzewo,kalibracja}.py
+          mkdir -p "$WORK/.zadanie"
+          [ -d dane ] && mv dane "$WORK/.zadanie/dane" || true
+          printf 'ZAUFANE=%s WORK=%s WYNIK=%s/agent exec bash "%s/.github/loop/utrzymanie.sh" sprawdz\n' \
+            "$ZAUFANE" "$WORK" "$WYNIK" "$ZAUFANE" > "$WORK/.zadanie/sprawdz.sh"
+          printf '.zadanie/\nbridge-out/\nassets/\n' > /tmp/wyjatki
+          git -C "$WORK" init -q
+          cp /tmp/wyjatki "$WORK/.git/info/exclude"
+          git -C "$WORK" add -A
+          git -C "$WORK" -c user.name="Kucze3205" -c user.email="kuczerowski2005@gmail.com" commit -q -m "Stan przed naprawą"
+          # APK zostaje na dysku agenta tak jak na dysku partii serii; poświadczenie nie
+          GH_TOKEN="$ASSETS_READ_TOKEN" gh release download v10.7.5 --repo Kucze3205/blockblast-assets --dir "$WORK/assets" --pattern '*.apk'
+      - name: Włącz KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Zależności i Claude Code
+        run: |
+          sudo apt-get install -y -q tesseract-ocr
+          pip install -q numpy pillow
+          pip install -q torch --index-url https://download.pytorch.org/whl/cpu   # testy silnika importują agenta
+          npm install -g @anthropic-ai/claude-code@2.1.289
+          git config --global author.name "Kucze3205"   # commity agenta w katalogu roboczym
+          git config --global author.email "kuczerowski2005@gmail.com"
+          git config --global committer.name "github-actions[bot]"
+          git config --global committer.email "41898282+github-actions[bot]@users.noreply.github.com"
+          mkdir -p ~/.claude/skills
+          cp -r loop/.claude/skills/utrzymanie ~/.claude/skills/
+          printf '{"hooks":{"PostToolUse":[{"matcher":"*","hooks":[{"type":"command","command":"python3 %s/.github/loop/zostalo.py"}]}]}}\n' \
+            "$ZAUFANE" > "$ZAUFANE/ustawienia.json"
+          python3 loop/.github/evaluator/kalibracja.py hashe --kod loop > "$WYNIK/hash-przed.json"
+          # checkout gałęzi pętli znika na czas sesji i wraca po niej
+          rm -rf loop
+      - name: Iteracje na emulatorze
+        uses: reactivecircus/android-emulator-runner@v2
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+        with:
+          api-level: 34
+          target: google_apis_playstore
+          arch: x86_64
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -memory 4096
+          script: bash ${{ runner.temp }}/zaufane/.github/loop/utrzymanie.sh petla
+      - if: always() && steps.wstrzymaj.outcome == 'success'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          path: loop
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Przyjęcie naprawy albo zgłoszenie dla właściciela
+        id: przyjecie
+        if: always() && steps.wstrzymaj.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -eu
+          cd loop
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          URL="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}"
+          STATUS=$(cat "$WYNIK/status" 2>/dev/null || echo awaria)
+          GALAZ="brak zmian"
+          HASH_PRZED=$(cat "$WYNIK/hash-przed.json" 2>/dev/null || echo "{}")
+          if [ -s "$WYNIK/naprawa.patch" ]; then
+            GALAZ="evaluator/$GITHUB_RUN_NUMBER"
+            git checkout -q -b "$GALAZ"
+            git apply "$WYNIK/naprawa.patch"
+            git add -A -- $(python3 .github/evaluator/kalibracja.py sciezki)
+            git commit -q -m "Utrzymanie ewaluatora ($POWOD, $ID): naprawa z przebiegu $GITHUB_RUN_ID"
+            git push -q "$URL" "$GALAZ"
+          fi
+          HASH_PO=$(python3 .github/evaluator/kalibracja.py hashe)
+          {
+            echo "### Utrzymanie ewaluatora: $STATUS"
+            echo "- powód: $POWOD, seria: $ID, gałąź naprawy: \`$GALAZ\`"
+            echo "- hash przed: \`$HASH_PRZED\`, po: \`$HASH_PO\` (zmiana części \`sym\` przelicza \`s_sym\` leniwie, \`most\` niczego)"
+            cat "$WYNIK/iteracje.md" 2>/dev/null || true
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$STATUS" = przeszla ]; then
+            # scalenie to szybkie przesunięcie gałęzi domyślnej; marker znika w osobnym commicie
+            for i in 1 2 3 4 5; do
+              git pull -q --rebase "$URL" "$DEFAULT_BRANCH" && git push -q "$URL" "HEAD:$DEFAULT_BRANCH" && break
+              sleep $((i * 10))
+            done
+            rm -f trees/utrzymanie.json
+            bash .github/loop/zapisz.sh "utrzymanie: naprawa przyjęta, serie na emulatorze ruszają" trees/utrzymanie.json
+            # po naprawie faza 0 liczy się od nowa: dopiero świeża seria bez rozjazdu ją zamyka
+            if [ "$POWOD" = faza0 ]; then gh workflow run faza0.yml --ref "$DEFAULT_BRANCH" -f proba=1; fi
+          else
+            git checkout -q "$DEFAULT_BRANCH"
+            printf '{"stan":"wstrzymane","powod":"%s","id":"%s","galaz":"%s","przebieg":"%s"}\n' \
+              "$POWOD" "$ID" "$GALAZ" "$RUN_URL" > trees/utrzymanie.json
+            bash .github/loop/zapisz.sh "utrzymanie: naprawa nieudana, serie na emulatorze wstrzymane" trees/utrzymanie.json
+            {
+              echo "Naprawa ewaluatora nie przeszła bramki po $ITERACJE iteracjach (status: $STATUS)."
+              echo
+              echo "- powód: \`$POWOD\`, seria: \`$ID\`"
+              echo "- przebieg: $RUN_URL (transkrypty iteracji w artefakcie \`utrzymanie-$GITHUB_RUN_ID\`)"
+              echo "- gałąź z ostatnią próbą: \`$GALAZ\`"
+              echo "- hash przed: \`$HASH_PRZED\`"
+              echo
+              echo "Wstrzymane są tylko serie na emulatorze (\`trees/utrzymanie.json\`); symulator i drzewo działają dalej."
+              echo "Po ręcznej naprawie na gałęzi domyślnej usuń \`trees/utrzymanie.json\`, a węzły ze stanem \`ocena w toku\`"
+              echo "oceń ponownie (\`ocena.yml\` z tym samym węzłem; wyniki ważnych partii zostają w rekordzie)."
+              echo
+              echo "## Iteracje"
+              echo
+              cat "$WYNIK/iteracje.md" 2>/dev/null || echo "(brak)"
+            } > "$RUNNER_TEMP/zgloszenie.md"
+            gh issue create --title "Ewaluator: naprawa nieudana ($POWOD, $ID)" --body-file "$RUNNER_TEMP/zgloszenie.md"
+          fi
+      # awaria samego przyjęcia (np. patch nie nakłada się na przesuniętą gałąź) nie może zostawić znacznika `naprawa`
+      - name: Znacznik po awarii przyjęcia
+        if: always() && steps.wstrzymaj.outcome == 'success' && steps.przyjecie.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -eu
+          cd loop
+          git checkout -q -f "$DEFAULT_BRANCH"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          printf '{"stan":"wstrzymane","powod":"%s","id":"%s","przebieg":"%s"}\n' "$POWOD" "$ID" "$RUN_URL" > trees/utrzymanie.json
+          bash .github/loop/zapisz.sh "utrzymanie: awaria przyjęcia naprawy, serie na emulatorze wstrzymane" trees/utrzymanie.json
+          gh issue create --title "Ewaluator: awaria przyjęcia naprawy ($POWOD, $ID)" \
+            --body "Przyjęcie naprawy w $RUN_URL zakończyło się błędem; wyniki iteracji w artefakcie \`utrzymanie-$GITHUB_RUN_ID\`. Serie na emulatorze wstrzymane (\`trees/utrzymanie.json\`)."
+      # transkrypty i wyniki sprawdzeń iteracji
+      - if: always() && steps.wstrzymaj.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: utrzymanie-${{ github.run_id }}
+          path: ${{ runner.temp }}/wynik
+          if-no-files-found: ignore

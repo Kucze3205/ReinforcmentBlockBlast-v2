@@ -1,0 +1,81 @@
+# Faza 0: seria 10 partii bazowego agenta (polityka z gałęzi domyślnej) na emulatorze, a z jej logów
+# kalibracja symulatora. Bez rozjazdu zakłada trees/faza0.json (pierwsze drzewo czeka na ten plik);
+# z rozjazdem albo unieważnioną partią otwiera utrzymanie ewaluatora, a po jego naprawie startuje od nowa.
+#   gh workflow run faza0.yml
+# Kontrakt: docs/loop-config.md.
+name: faza0
+run-name: faza0 próba ${{ inputs.proba }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      proba:
+        description: Numer próby (ponowienia po awarii infrastruktury)
+        required: false
+        default: "1"
+
+permissions:
+  contents: read
+
+jobs:
+  seria:
+    if: vars.AUTOPILOT == 'on'
+    concurrency:
+      group: seria
+      cancel-in-progress: false
+    uses: ./.github/workflows/seria.yml
+    with:
+      seria: faza0
+    secrets: inherit
+
+  wynik:
+    needs: seria
+    if: ${{ !cancelled() && needs.seria.result != 'skipped' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # zestaw kontrolny i znacznik fazy 0 na gałęzi domyślnej; ten job nie uruchamia kodu węzła
+      actions: write    # dispatch utrzymania i ponowienia
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+      PROBA: ${{ inputs.proba }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: seria-faza0-partia-*
+          path: seria
+      - name: Rozjazd symulatora względem logów serii
+        run: |
+          set -u
+          python3 .github/evaluator/kalibracja.py rozjazd --seria seria --out rozjazd.json --podsumowanie "$GITHUB_STEP_SUMMARY" || true
+          [ -f rozjazd.json ] || echo '{"ok": false}' > rozjazd.json
+          AKCJA=$(python3 .github/evaluator/kalibracja.py wyzwalacz --seria seria --rozjazd rozjazd.json --proba "$PROBA")
+          echo "AKCJA=$AKCJA" >> "$GITHUB_ENV"
+          echo "wyzwalacz: $AKCJA"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rozjazd-faza0
+          path: rozjazd.json
+      - name: Znacznik fazy 0 albo utrzymanie
+        run: |
+          set -eu
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # logi serii są zestawem kontrolnym, przy którym naprawa ma przejść; zawsze, bo to wzorzec odniesienia
+          python3 .github/evaluator/kalibracja.py zestaw --seria seria --nazwa faza0
+          case "$AKCJA" in
+            brak)
+              mkdir -p trees
+              printf '{"stan":"gotowa","run":"%s"}\n' "$GITHUB_RUN_ID" > trees/faza0.json
+              bash .github/loop/zapisz.sh "faza 0: symulator skalibrowany do mostu" trees/faza0.json .github/evaluator/kalibracja/zestaw ;;
+            ponow*)
+              bash .github/loop/zapisz.sh "faza 0: zestaw kontrolny z próby $PROBA" .github/evaluator/kalibracja/zestaw
+              gh workflow run faza0.yml --ref "$DEFAULT_BRANCH" -f proba="$((PROBA + 1))" ;;
+            utrzymanie*)
+              bash .github/loop/zapisz.sh "faza 0: zestaw kontrolny z próby $PROBA" .github/evaluator/kalibracja/zestaw
+              gh workflow run utrzymanie.yml --ref "$DEFAULT_BRANCH" -f powod=faza0 -f id=faza0 -f run="$GITHUB_RUN_ID" ;;
+          esac

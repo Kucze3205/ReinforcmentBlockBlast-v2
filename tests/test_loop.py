@@ -29,6 +29,17 @@ class PrzyczynaTest(unittest.TestCase):
         _, limited, _ = self.cause({"is_error": True, "result": "You've hit your session limit"})
         self.assertTrue(limited)
 
+    def test_czekanie_na_limit_w_sekundach(self):
+        t = loop.now()
+        reset = int((t + timedelta(minutes=30)).timestamp())
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False, encoding="utf-8") as fh:
+            json.dump({"is_error": True, "result": "You've hit your session limit", "resetsAt": reset}, fh)
+        try:
+            self.assertAlmostEqual(loop.limit_s(fh.name, "1", t), 1800, delta=2)
+            self.assertEqual(loop.limit_s(fh.name + ".brak", "1", t), 0)   # brak pliku wykonania to nie limit
+        finally:
+            os.unlink(fh.name)
+
     def test_termin_resetu_w_sekundach_i_milisekundach(self):
         _, _, r1 = self.cause('{"resetsAt": 1790000000}')
         _, _, r2 = self.cause('{"resets_at": 1790000000000}')

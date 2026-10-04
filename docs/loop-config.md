@@ -42,12 +42,61 @@ Pierwszy krok pętli, `AUTOPILOT`, sprawdza `ocena.yml`; `seria.yml` wywołana z
 | `s_v` | `1 + s_emu` przy pełnej serii, inaczej `s_sym`; liczy `ocena.s_v()`, nie jest zapisywane |
 | próg serii | 0 przegranych w symulatorze i ocena nie „za wolna" (shard przekroczył `limit_shardu_s`) |
 | partia serii | `pomiar.json` z mostu: `koniec` = `cel` \| `przegrana` \| `przerwanie` \| `awaria`; ważne tylko dwie pierwsze |
-| powtórka | brakujące numery partii (`partie`), wynik scala `ocena.py zlicz --poprzednia`; do pełnych 10 ważnych status to `w_toku` |
+| powtórka | brakujące numery partii (`partie`); ważne partie z wcześniejszych przebiegów `ocena.yml` bierze z `oceny.emu` rekordu węzła (`ocena.py zlicz --poprzednia`); do pełnych 10 ważnych status to `w_toku` |
 | bramka celu | `ocena.py bramka ocena.json`: 10 ważnych partii, wszystkie `cel`; kod 0 = cel osiągnięty ; `ocena.yml` zakłada wtedy `trees/cel.json` — znacznik końca pętli, który ma sprawdzać harmonogram drzewa |
 | hash | `sym` (symulator, generator, punktacja, `ocena.py`, parametry, rozdania drzewa) i `most` (most, `seria.yml`, liczba partii i cel); naprawa mostu nie przelicza `s_sym` |
 | tylko do odczytu | pliki z `tylko_do_odczytu` w `config.json`: ewaluator nakłada je z gałęzi domyślnej na kopię węzła |
 | rekord węzła | `ocena.yml` dopisuje do `oceny` (`s_sym` per hash, `sym` z przeżyciem per rozdanie, `emu` z wynikami partii i unieważnionymi, `hash_most`; `czas_sym_min` raz, z pierwszej oceny; `s_emu` i `czas_serii_min` dopiero przy pełnej serii) i ustawia `stan`: `oceniony` albo `ocena w toku`; `oczekiwanie_min` zostaje po stronie wywołującego |
 | polityka węzła | `policies.build(weights)`; wagi z katalogu `weights/` węzła (`.gitignore` przepuszcza tam `*.pth`) |
+
+---
+
+## Faza 0 i utrzymanie ewaluatora (`faza0.yml`, `utrzymanie.yml`, `.github/evaluator/kalibracja.py`)
+
+Symulator ma zgadzać się z oryginałem, a most z ekranem. Miary liczy `kalibracja.py` z `moves.jsonl` mostu
+(stan, tacka, ruch, licznik apki przed ruchem), tolerancje w `config.json` (`kalibracja`):
+
+| Miara | Zasada |
+|---|---|
+| tempo punktów | te same ruchy zagrane w symulatorze dają sumę punktów w ±15% od przyrostu licznika apki; odczyty licznika spoza `0..max_delta` odrzucane, ruch i tak zagrany (combo) |
+| rozkład klocków | tacki z logu (nowa runda = trzy pełne sloty) vs rozkład generatora symulatora, χ² z p ≥ 0,01; nieznany kształt = błąd odczytu mostu (≤ 2%) |
+| brak danych | za mało par (`min_pary`) albo klocków (`min_klockow`) to **nie zgoda**: wyzwalacz i bramka traktują to jak rozjazd (zepsuty OCR nie może przejść niezauważony); wyjątek: miary krótkiego odcinka w bramce |
+
+**Faza 0** (`gh workflow run faza0.yml`, ręcznie raz): `seria.yml` z polityką gałęzi domyślnej (bazowy agent), potem
+`kalibracja.py rozjazd`. Bez rozjazdu zakłada `trees/faza0.json` (pierwsze drzewo czeka na ten plik). Z rozjazdem albo
+unieważnioną partią otwiera utrzymanie (`powod=faza0`); po przyjętej naprawie faza 0 startuje od nowa i dopiero świeża seria
+bez rozjazdu ją zamyka. Logi serii zostają jako zestaw kontrolny `faza0`.
+
+**Wyzwalacze** (mechaniczne, `kalibracja.py wyzwalacz`, po każdej serii w `ocena.yml` i `faza0.yml`):
+
+| Zdarzenie | Skutek |
+|---|---|
+| partia unieważniona, ale z dowodem awarii infrastruktury (brak `pomiar.json`, `adb`, `device`, `emulator`, `INSTALL`) | ponowienie tych partii bez agenta, do `ponowienia` (3) prób; potem utrzymanie `most` |
+| partia unieważniona bez takiego dowodu (np. gra nie na pierwszym planie, limit czasu) | utrzymanie `most` |
+| miara rozjazdu poza tolerancją (przy czystej serii) | logi serii wchodzą do zestawu kontrolnego, utrzymanie `rozjazd` |
+
+Serie nie zostawiające żadnej partii liczą się jak awaria infrastruktury. Sondy kontrolnej symulatora „co k-ty raz” nie ma.
+
+**Zestaw kontrolny:** `.github/evaluator/kalibracja/zestaw/*.jsonl.gz` (pierwsze 300 ruchów każdej partii, zwarty zapis):
+logi fazy 0 i serii, które wykazały rozjazd. Czyste serie nie wchodzą do zestawu (rósłby bez końca bez nowej informacji).
+
+**`utrzymanie.yml`** (`-f powod=<faza0|most|rozjazd> -f id=<seria> -f run=<przebieg z artefaktami>`):
+
+| Krok | Co |
+|---|---|
+| warunek | gdy istnieje `trees/utrzymanie.json` (naprawa trwa albo czeka na właściciela), wyzwalacz nic nie robi |
+| wstrzymanie | `trees/utrzymanie.json` `{"stan":"naprawa"}`: `ocena.yml` czeka ze swoją serią (do ok. 5,5 h, potem węzeł zostaje `ocena w toku`); symulator i węzły działają dalej |
+| katalog agenta | kod projektu i ewaluatora bez `.github/{workflows,loop,policy}`, dokumentów, rekordów, `.claude` i historii gita; własne repo bez remote'a; `.zadanie/` (zadanie, dane serii, `sprawdz.sh`); APK w `assets/` |
+| iteracja | sesja agenta (skill `utrzymanie`, Sonnet, `--max-turns 120`, 60 min; limit subskrypcji = czekanie do resetu, iteracja się nie liczy) → sprawdzenie; do `iteracje` (3) iteracji w jednym jobie, emulator uruchomiony raz |
+| sprawdzenie | testy `tests.test_engine` i `tests.test_bridge` z kodem naprawy; `tools/bridge.sh` z `MOVES=150`; `kalibracja.py bramka`: zestaw kontrolny w tolerancji (twardo, brak danych = porażka) i odcinek: koniec `przegrana` albo `przerwanie` z powodem `limit ruchów` (awaria lub inne przerwanie = porażka), miary odcinka tylko gdy ma dość danych (krótka przegrana ich zwykle nie ma) |
+| ścieżki | agent zmienia tylko pliki z `kalibracja.py sciezki` (`tylko_do_odczytu` + `utrzymanie.dodatkowe`: testy silnika i mostu); każda inna zmiana unieważnia iterację, a łatka ich nie zawiera. Bramka i `config.json` są poza zasięgiem: działają z kopii `ZAUFANE` |
+| poświadczenie | `CLAUDE_CODE_OAUTH_TOKEN` ma tylko proces claude; kod naprawy uruchamiany przez sprawdzenie (most) go nie widzi |
+| przyjęcie | łatka na gałąź `evaluator/<n>`; po przejściu bramki szybkie przesunięcie gałęzi domyślnej (bez PR), usunięcie znacznika i (dla `faza0`) nowa faza 0 |
+| po 3 nieudanych | znacznik `{"stan":"wstrzymane"}`, issue dla właściciela (miary, iteracje, gałąź), tylko serie na emulatorze stoją |
+| hash | po przyjęciu zmienia się właściwa część hasha (pliki `sym` albo `most`), bo hash liczy się z plików gałęzi domyślnej; podsumowanie przebiegu pokazuje przed/po. Zmiana `sym` przelicza `s_sym` leniwie |
+
+Po `wstrzymane` właściciel naprawia ewaluator ręcznie na gałęzi domyślnej, usuwa `trees/utrzymanie.json` i ocenia ponownie
+węzły ze stanem `ocena w toku` (`ocena.yml` z tym samym węzłem; ważne partie zostają w rekordzie).
 
 ---
 
@@ -153,7 +202,7 @@ niczego nie robi, więc powtórzone wywołania są nieszkodliwe. Drzewa startuj�
 | `.github/policy/config.json` | Konfiguracja właściciela, jedyne miejsce: `W` (paczka ≤ W węzłów naraz), `K` (rund na drzewo, wspólne dla drzewa na żywo i odtwarzania), `beta` (na godzinę), `M` (wersji w fazie offline). Zmiana `beta` zmienia definicję V; korekta `W`/`K` to commit właściciela, od następnego drzewa. |
 | `.github/policy/policy.py` | Polityka: `solve(question)` zwraca paczkę. Pisze ją wyłącznie job wdrożenia, nigdy sesja LLM. Polityka startowa: pełne `W` łańcuchów od korzenia, potem kontynuacja każdego, aż `K` rund albo 2 kolejne węzły bez poprawy względem rodzica. |
 | `trees/<t>.json` | Stan drzewa: `polityka` (skrót treści, przypięty na całe drzewo; zmiana w trakcie to błąd), `paczki` (nazwy węzłów w kolejności rund; kolejność utworzenia = pozycja po spłaszczeniu, od 1), `koniec` (`null` albo `powod`, `T_h`, `V`). |
-| `trees/baseline.json` | Opcjonalny `{"s_v": x}` z fazy 0: punkt odniesienia dla węzłów od korzenia. Bez pliku baseline to 0. |
+| `trees/baseline.json` | Opcjonalny `{"s_v": x}` zapisywany ręcznie: punkt odniesienia dla węzłów od korzenia. Faza 0 go nie pisze (`s_sym` zależy od rozdań drzewa, a przed kalibracją niczego nie znaczy). Bez pliku baseline to 0. |
 
 **Widok polityki (`question`).** `max_parallelism` (W), `max_rounds` (K), `round` (ukończone rundy),
 `baseline_score`, `observed()` (ocenione węzły: `wezel`, `lancuch`, `glebokosc`, `rodzic`, `s_v`,
