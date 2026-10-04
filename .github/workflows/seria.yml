@@ -4,8 +4,8 @@
 #   gh workflow run seria.yml -f seria=<id> [-f wezel=<sha>] [-f partie='[3,7]']
 # Wynik partii K: artefakt `seria-<id>-partia-K` (katalog z pomiar.json):
 #   gh run download <run-id> -n seria-<id>-partia-K
-# Jedna seria naraz pilnuje wywołujący job w ocena.yml (concurrency: seria); ręcznych
-# uruchomień nie wolno nakładać na siebie.
+# Serie nie mają własnej kolejki: partie czekają na wolne joby platformy (kolejka GitHuba nie gubi
+# jobów, w odróżnieniu od `concurrency`, które anuluje oczekujące uruchomienie).
 name: seria
 run-name: seria ${{ inputs.seria }}
 

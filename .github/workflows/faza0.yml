@@ -20,9 +20,6 @@ permissions:
 jobs:
   seria:
     if: vars.AUTOPILOT == 'on'
-    concurrency:
-      group: seria
-      cancel-in-progress: false
     uses: ./.github/workflows/seria.yml
     with:
       seria: faza0

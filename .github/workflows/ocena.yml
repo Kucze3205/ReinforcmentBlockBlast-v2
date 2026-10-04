@@ -113,9 +113,6 @@ jobs:
   seria:
     needs: [prog, emulator]
     if: ${{ needs.prog.outputs.seria == 'true' && needs.emulator.outputs.seria == 'tak' }}
-    concurrency:
-      group: seria
-      cancel-in-progress: false
     uses: ./.github/workflows/seria.yml
     with:
       seria: ${{ inputs.id }}
