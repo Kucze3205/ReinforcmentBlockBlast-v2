@@ -113,6 +113,7 @@ def sym(node, drzewo, shard, shardy, out):
     seeds = rozdania(drzewo, cfg["rozdania"])
     os.environ.pop("DEALS_SALT", None)   # kod węzła nie czyta soli
     mine = list(range(shard, len(seeds), shardy))
+    t0 = time.monotonic()
     rec = {"drzewo": drzewo, "hash_sym": hash_sym(deals_digest(seeds), cfg),
            "shard": shard, "gry": [], "blad": None}
     try:
@@ -129,6 +130,7 @@ def sym(node, drzewo, shard, shardy, out):
             ruchy, punkty, blad = graj(policy, seeds[i], cfg["cap"], Game)
             rec["gry"].append({"i": i, "ruchy": ruchy, "punkty": punkty})
             rec["blad"] = rec["blad"] or blad
+    rec["czas_s"] = round(time.monotonic() - t0, 1)
     Path(out).write_text(json.dumps(rec), encoding="utf-8")
 
 
@@ -156,6 +158,7 @@ def zlicz_sym(shard_dir, cfg):
         "punkty_srednie": round(mean_punkty, 2),
         "przegrane": sum(g["ruchy"] < cfg["cap"] for g in gry),
         "za_wolna": n < cfg["rozdania"],
+        "czas_min": round(max(s.get("czas_s", 0) for s in shards) / 60, 1),   # shardy idą równolegle
         "blad": next((s["blad"] for s in shards if s["blad"]), None),
         "s_sym": min(1.0, mean_ruchy / cfg["cap"] + cfg["tie"] * mean_punkty),
     }
@@ -239,6 +242,7 @@ def zapisz(ocena, rekord, cel_path):
     o.setdefault("s_sym", {})[s["hash"]] = s["s_sym"]
     o.setdefault("sym", {})[s["hash"]] = {k: s[k] for k in ("przezycie", "przegrane", "za_wolna", "blad", "punkty_srednie")}
     o["hash_most"] = ocena["hash"]["most"]
+    o.setdefault("czas_sym_min", s.get("czas_min", 0))   # koszt z nagrania: późniejsze przeliczenia go nie zmieniają
     emu = ocena.get("emu")
     if emu:
         o["emu"] = emu

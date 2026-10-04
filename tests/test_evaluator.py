@@ -207,9 +207,9 @@ class ZliczTest(unittest.TestCase):
 
 
 class ZapiszTest(unittest.TestCase):
-    def ocena(self, ruchy, seria=None, hash_="h1"):
+    def ocena(self, ruchy, seria=None, hash_="h1", czas_s=0):
         with tempfile.TemporaryDirectory() as d:
-            zapisz(d + "/sym/sym-0.json", {"hash_sym": hash_, "blad": None,
+            zapisz(d + "/sym/sym-0.json", {"hash_sym": hash_, "blad": None, "czas_s": czas_s,
                                            "gry": [{"i": i, "ruchy": r, "punkty": 0} for i, r in enumerate(ruchy)]})
             cfg, ocena.config = ocena.config, lambda: dict(CFG, rozdania=len(ruchy))
             try:
@@ -232,6 +232,13 @@ class ZapiszTest(unittest.TestCase):
             self.assertNotIn("s_emu", rec["oceny"])
             self.assertEqual(rec["oczekiwanie_min"], 0.0)
             self.assertFalse((Path(d) / "cel.json").exists())
+
+    def test_czas_symulatora_zostaje_z_nagrania(self):
+        with tempfile.TemporaryDirectory() as d:
+            rek = self.rekord(d)
+            ocena.zapisz(self.ocena([5, 7], hash_="h1", czas_s=600), rek, d + "/cel.json")
+            ocena.zapisz(self.ocena([9, 9], hash_="h2", czas_s=60), rek, d + "/cel.json")
+            self.assertEqual(json.loads(rek.read_text())["oceny"]["czas_sym_min"], 10.0)
 
     def test_przeliczenie_dopisuje_wersje_zamiast_nadpisywac(self):
         with tempfile.TemporaryDirectory() as d:

@@ -46,7 +46,7 @@ Pierwszy krok pętli, `AUTOPILOT`, sprawdza `ocena.yml`; `seria.yml` wywołana z
 | bramka celu | `ocena.py bramka ocena.json`: 10 ważnych partii, wszystkie `cel`; kod 0 = cel osiągnięty ; `ocena.yml` zakłada wtedy `trees/cel.json` — znacznik końca pętli, który ma sprawdzać harmonogram drzewa |
 | hash | `sym` (symulator, generator, punktacja, `ocena.py`, parametry, rozdania drzewa) i `most` (most, `seria.yml`, liczba partii i cel); naprawa mostu nie przelicza `s_sym` |
 | tylko do odczytu | pliki z `tylko_do_odczytu` w `config.json`: ewaluator nakłada je z gałęzi domyślnej na kopię węzła |
-| rekord węzła | `ocena.yml` dopisuje do `oceny` (`s_sym` per hash, `sym` z przeżyciem per rozdanie, `emu` z wynikami partii i unieważnionymi, `hash_most`; `s_emu` i `czas_serii_min` dopiero przy pełnej serii) i ustawia `stan`: `oceniony` albo `ocena w toku`; `oczekiwanie_min` zostaje po stronie wywołującego |
+| rekord węzła | `ocena.yml` dopisuje do `oceny` (`s_sym` per hash, `sym` z przeżyciem per rozdanie, `emu` z wynikami partii i unieważnionymi, `hash_most`; `czas_sym_min` raz, z pierwszej oceny; `s_emu` i `czas_serii_min` dopiero przy pełnej serii) i ustawia `stan`: `oceniony` albo `ocena w toku`; `oczekiwanie_min` zostaje po stronie wywołującego |
 | polityka węzła | `policies.build(weights)`; wagi z katalogu `weights/` węzła (`.gitignore` przepuszcza tam `*.pth`) |
 
 ---
@@ -132,6 +132,47 @@ nigdy przez literał `main`.
 Powód jest jeden i wystarczający: **pętla nie może edytować `.github/workflows/`**
 (akcja twardo tego zabrania). Nazwa wpisana na sztywno byłaby jedyną rzeczą, której
 pętla nie umie naprawić, umieszczoną w jedynym miejscu, którego nie umie tknąć.
+
+---
+
+## Drzewo na żywo — `drzewo.yml`, `.github/policy/`, `.github/loop/drzewo.py`
+
+```bash
+gh variable set AUTOPILOT --body on
+gh workflow run drzewo.yml        # start: bieżące otwarte drzewo albo następne po zamkniętym
+```
+
+Harmonogram jest zdarzeniowy: krótki job `krok` (grupa `polityka`, kroki idą po kolei) czyta `trees/`,
+a dalej robi jedno z trzech: czeka (ostatnia paczka ma nieocenione węzły), otwiera następną paczkę
+(commit `trees/<t>.json`, potem `wezel.yml` dla każdego jej węzła) albo zamyka drzewo. Wywołuje go
+koniec oceny każdego węzła (`ocena.yml`, a dla węzła bez zmian `wezel.yml`). Krok bez zmian w drzewie
+niczego nie robi, więc powtórzone wywołania są nieszkodliwe. Drzewa startują od tagu `korzen`.
+
+| Plik | Co to |
+|---|---|
+| `.github/policy/config.json` | Konfiguracja właściciela, jedyne miejsce: `W` (paczka ≤ W węzłów naraz), `K` (rund na drzewo, wspólne dla drzewa na żywo i odtwarzania), `beta` (na godzinę), `M` (wersji w fazie offline). Zmiana `beta` zmienia definicję V; korekta `W`/`K` to commit właściciela, od następnego drzewa. |
+| `.github/policy/policy.py` | Polityka: `solve(question)` zwraca paczkę. Pisze ją wyłącznie job wdrożenia, nigdy sesja LLM. Polityka startowa: pełne `W` łańcuchów od korzenia, potem kontynuacja każdego, aż `K` rund albo 2 kolejne węzły bez poprawy względem rodzica. |
+| `trees/<t>.json` | Stan drzewa: `polityka` (skrót treści, przypięty na całe drzewo; zmiana w trakcie to błąd), `paczki` (nazwy węzłów w kolejności rund; kolejność utworzenia = pozycja po spłaszczeniu, od 1), `koniec` (`null` albo `powod`, `T_h`, `V`). |
+| `trees/baseline.json` | Opcjonalny `{"s_v": x}` z fazy 0: punkt odniesienia dla węzłów od korzenia. Bez pliku baseline to 0. |
+
+**Widok polityki (`question`).** `max_parallelism` (W), `max_rounds` (K), `round` (ukończone rundy),
+`baseline_score`, `observed()` (ocenione węzły: `wezel`, `lancuch`, `glebokosc`, `rodzic`, `s_v`,
+`delta` względem rodzica), `legal_actions()` (`None` = nowy łańcuch od korzenia; czubki łańcuchów).
+Akcja `None` otwiera łańcuch od korzenia, nazwa czubka kontynuuje jego łańcuch. Maszyneria odrzuca
+akcje niedozwolone, liść bierze najwyżej raz i obcina paczkę do `W`. Pusta paczka kończy drzewo.
+Odtwarzanie nagranego drzewa używa tych samych `Pytanie`, `paczka`, `nazwij`, `czas_h` i `wartosc`
+z `drzewo.py`; różni się tylko tym, że ujawnia zapisane rekordy zamiast uruchamiać węzły.
+
+**Czas.** Koszt węzła w godzinach = `koszt.minuty` (sesja) + `oceny.czas_sym_min` + `oceny.czas_serii_min`;
+`oczekiwanie_min` poza kosztem. Węzeł dziedziczony (kod bez zmian względem rodzica, nie korzenia) płaci
+tylko za sesję. Paczka kosztuje najdłuższy z jej węzłów, `T` to suma po paczkach, `V = max s_v − beta·T`.
+Seria jest jedna na paczkę z natury: partie idą równolegle, a paczka płaci za najdłuższy węzeł.
+
+**Zamknięcie.** Powód: `pusta paczka`, `K` albo `cel` (obecność `trees/cel.json`). Po `pusta paczka`
+i `K` krok dispatchuje `offline.yml -f drzewo=<t>`; ten workflow musi używać grupy `polityka`
+(następne drzewo czeka, aż skończy) i na końcu wywołać `drzewo.yml` bez argumentu, co otwiera
+następne drzewo. Po `cel` pętla się kończy: offline się nie odpala, nowe drzewo nie powstaje,
+węzły w toku dokańczają się same.
 
 ---
 

@@ -6,7 +6,10 @@ Szczegóły (sekrety, zmienne, uprawnienia): [docs/loop-config.md](docs/loop-con
 
 ```
 gh variable set AUTOPILOT --body on
+gh workflow run drzewo.yml
 ```
+
+Drugie polecenie startuje harmonogram drzewa: dalej pętla biegnie sama, aż bramka celu ją zakończy.
 
 ## Wyłączenie
 

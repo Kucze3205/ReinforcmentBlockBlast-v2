@@ -96,7 +96,8 @@ jobs:
     if: ${{ !cancelled() && needs.prog.result == 'success' }}
     runs-on: ubuntu-latest
     permissions:
-      contents: write   # tylko zapis rekordu węzła; ten job nie uruchamia kodu węzła
+      contents: write   # zapis rekordu węzła; ten job nie uruchamia kodu węzła
+      actions: write    # dispatch harmonogramu drzewa
     steps:
       - uses: actions/checkout@v4
         with:
@@ -122,6 +123,7 @@ jobs:
       - name: Zapisz ocenę w rekordzie węzła
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
           DRZEWO: ${{ inputs.drzewo }}
           ID: ${{ inputs.id }}
@@ -134,3 +136,7 @@ jobs:
           PLIKI="trees/$DRZEWO/$WEZEL.json"
           if [ -f trees/cel.json ]; then PLIKI="$PLIKI trees/cel.json"; fi
           bash .github/loop/zapisz.sh "ocena $DRZEWO/$WEZEL" $PLIKI
+          # oceniony węzeł kończy paczkę albo nie; to harmonogram drzewa rozstrzyga
+          if [ "$(jq -r .stan "trees/$DRZEWO/$WEZEL.json")" = oceniony ]; then
+            gh workflow run drzewo.yml --ref "$DEFAULT_BRANCH" -f drzewo="$DRZEWO"
+          fi

@@ -152,6 +152,7 @@ jobs:
           case "$AKCJA" in
             park|kontynuuj) gh workflow run wezel.yml --ref "$DEFAULT_BRANCH" -f drzewo="$DRZEWO" -f wezel="$WEZEL" -f kolejnosc="$KOLEJNOSC" ;;
             ocena) gh workflow run ocena.yml --ref "$DEFAULT_BRANCH" -f wezel="$SHA" -f drzewo="$DRZEWO" -f id="$DRZEWO-$WEZEL" ;;
+            dziedzicz) gh workflow run drzewo.yml --ref "$DEFAULT_BRANCH" -f drzewo="$DRZEWO" ;;
           esac
       # transkrypt: z niego liczy się udział historii w oknie kontekstu
       - if: always() && steps.przygotuj.outcome == 'success'
