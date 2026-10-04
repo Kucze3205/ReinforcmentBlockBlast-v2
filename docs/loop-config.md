@@ -65,7 +65,7 @@ Symulator ma zgadzać się z oryginałem, a most z ekranem. Miary liczy `kalibra
 **Faza 0** (`gh workflow run faza0.yml`, ręcznie raz): `seria.yml` z polityką gałęzi domyślnej (bazowy agent), potem
 `kalibracja.py rozjazd`. Bez rozjazdu zakłada `trees/faza0.json` (pierwsze drzewo czeka na ten plik). Z rozjazdem albo
 unieważnioną partią otwiera utrzymanie (`powod=faza0`); po przyjętej naprawie faza 0 startuje od nowa i dopiero świeża seria
-bez rozjazdu ją zamyka. Logi serii zostają jako zestaw kontrolny `faza0`.
+bez rozjazdu ją zamyka. Logi serii zostają jako zestaw kontrolny `faza0`. `drzewo.yml` nie robi nic, dopóki `trees/faza0.json` nie istnieje.
 
 **Wyzwalacze** (mechaniczne, `kalibracja.py wyzwalacz`, po każdej serii w `ocena.yml` i `faza0.yml`):
 

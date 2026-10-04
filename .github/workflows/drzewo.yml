@@ -39,6 +39,8 @@ jobs:
       - name: Krok harmonogramu
         run: |
           set -eu
+          # przed kalibracją symulatora s_sym nic nie znaczy: pierwsze drzewo czeka na koniec fazy 0 (faza0.yml)
+          if [ ! -f trees/faza0.json ]; then echo "faza 0 nie skończona (brak trees/faza0.json)"; exit 0; fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           T=$(python3 .github/loop/drzewo.py numer "${{ inputs.drzewo }}")
