@@ -1,0 +1,9 @@
+{
+  "n_seeds": 300,
+  "move_cap": 2000,
+  "epsilon": 0.0,
+  "torch_seed": 0,
+  "threshold_pct": 10.0,
+  "fixed_seed_file": "bench/seeds_fixed.json",
+  "rotated_seed_salt": 2654435761
+}

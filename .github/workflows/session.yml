@@ -1,0 +1,237 @@
+# Sesja pętli. Wejście zawsze jedno: numer issue. Rola, model i budżet z etykiet + .claude/profiles.yml.
+# Nie wołaj wprost — wejście publiczne to dispatch.yml (walidacja, deduplikacja).
+#
+# Kod pętli (.github/loop/) biegnie z checkoutu gałęzi domyślnej (`loop/`), agent pracuje w osobnym
+# checkoutcie zadania (`work/`): agent nie może zmienić kodu, który go pilnuje.
+# Trzy kształty runnera: plain (bez emulatora), emulator (jedyna rola z Androidem), bench (bez agenta).
+name: session
+run-name: session #${{ inputs.issue }}${{ inputs.role && format(' · {0}', inputs.role) || '' }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      issue:
+        description: Numer issue z etykietą rola:*
+        required: true
+      role:
+        description: Rola (tylko do nazwy przebiegu)
+        required: false
+
+concurrency:
+  group: session-${{ inputs.issue }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  issues: write
+  actions: write
+
+jobs:
+  prep:
+    if: vars.AUTOPILOT == 'on'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      go: ${{ steps.guard.outputs.go }}
+      kind: ${{ steps.resolve.outputs.kind }}
+      role: ${{ steps.resolve.outputs.role }}
+      model: ${{ steps.resolve.outputs.model }}
+      effort: ${{ steps.resolve.outputs.effort }}
+      start: ${{ steps.resolve.outputs.start }}
+      tools: ${{ steps.resolve.outputs.tools }}
+      max_turns: ${{ steps.resolve.outputs.max_turns }}
+      agent_timeout: ${{ steps.resolve.outputs.agent_timeout }}
+      job_timeout: ${{ steps.resolve.outputs.job_timeout }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      VARS_AUTOPILOT: ${{ vars.AUTOPILOT }}
+      DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+      # AUTOPILOT jest pierwszym krokiem: sesja utworzona tuż przed wyłączeniem też się zatrzyma
+      - id: guard
+        run: |
+          if python3 .github/loop/loop.py guard; then echo go=true >> "$GITHUB_OUTPUT"; else echo go=false >> "$GITHUB_OUTPUT"; fi
+      # martwe poświadczenie kończy job, zanim wstanie agent
+      - if: steps.guard.outputs.go == 'true'
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+        run: python3 .github/loop/loop.py probe
+      - id: resolve
+        if: steps.guard.outputs.go == 'true'
+        run: |
+          pip install -q pyyaml
+          python3 .github/loop/loop.py resolve "${{ inputs.issue }}"
+
+  plain:
+    needs: prep
+    if: needs.prep.outputs.go == 'true' && needs.prep.outputs.kind == 'plain'
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ fromJSON(needs.prep.outputs.job_timeout) }}
+    env:
+      ISSUE: ${{ inputs.issue }}
+      ROLE: ${{ needs.prep.outputs.role }}
+      MODEL: ${{ needs.prep.outputs.model }}
+      EFFORT: ${{ needs.prep.outputs.effort }}
+      TOOLS: ${{ needs.prep.outputs.tools }}
+      MAX_TURNS: ${{ needs.prep.outputs.max_turns }}
+      AGENT_TIMEOUT: ${{ needs.prep.outputs.agent_timeout }}
+      WORK: ${{ github.workspace }}/work
+      DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+      VARS_AUTOPILOT: ${{ vars.AUTOPILOT }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          path: loop
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prep.outputs.start }}
+          path: work
+          fetch-depth: 0
+      - run: |
+          pip install -q pyyaml numpy pillow
+          pip install -q torch --index-url https://download.pytorch.org/whl/cpu
+          npm install -g @anthropic-ai/claude-code@2.1.284
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config --global author.name "Kucze3205"   # pętla działa w imieniu właściciela; bot zostaje committerem
+          git config --global author.email "kuczerowski2005@gmail.com"
+      - id: guard
+        working-directory: loop
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if python3 .github/loop/loop.py guard; then echo go=true >> "$GITHUB_OUTPUT"; else echo go=false >> "$GITHUB_OUTPUT"; fi
+      - if: steps.guard.outputs.go == 'true'
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          LOOP_GH_TOKEN: ${{ github.token }}
+        run: bash loop/.github/loop/agent.sh
+      - name: Epilog
+        if: always() && steps.guard.outputs.go == 'true'
+        working-directory: loop
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 .github/loop/loop.py finalize "$ISSUE" "$WORK"
+
+  emulator:
+    needs: prep
+    if: needs.prep.outputs.go == 'true' && needs.prep.outputs.kind == 'emulator'
+    runs-on: ubuntu-latest
+    # job_timeout < 360: limit 6 h zabija joba jako FAILED, epilog musi zdążyć
+    timeout-minutes: ${{ fromJSON(needs.prep.outputs.job_timeout) }}
+    env:
+      ISSUE: ${{ inputs.issue }}
+      ROLE: ${{ needs.prep.outputs.role }}
+      MODEL: ${{ needs.prep.outputs.model }}
+      EFFORT: ${{ needs.prep.outputs.effort }}
+      TOOLS: ${{ needs.prep.outputs.tools }}
+      MAX_TURNS: ${{ needs.prep.outputs.max_turns }}
+      AGENT_TIMEOUT: ${{ needs.prep.outputs.agent_timeout }}
+      WORK: ${{ github.workspace }}/work
+      DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+      VARS_AUTOPILOT: ${{ vars.AUTOPILOT }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          path: loop
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prep.outputs.start }}
+          path: work
+          fetch-depth: 0
+      - name: Włącz KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - run: |
+          sudo apt-get install -y -q tesseract-ocr
+          pip install -q pyyaml numpy pillow
+          pip install -q torch --index-url https://download.pytorch.org/whl/cpu
+          npm install -g @anthropic-ai/claude-code@2.1.284
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config --global author.name "Kucze3205"   # pętla działa w imieniu właściciela; bot zostaje committerem
+          git config --global author.email "kuczerowski2005@gmail.com"
+      - name: Pobierz APK z prywatnego release
+        working-directory: work
+        env:
+          GH_TOKEN: ${{ secrets.ASSETS_READ_TOKEN }}
+        run: gh release download v10.7.5 --repo Kucze3205/blockblast-assets --dir assets --pattern '*.apk'
+      - id: guard
+        working-directory: loop
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if python3 .github/loop/loop.py guard; then echo go=true >> "$GITHUB_OUTPUT"; else echo go=false >> "$GITHUB_OUTPUT"; fi
+      - if: steps.guard.outputs.go == 'true'
+        uses: reactivecircus/android-emulator-runner@v2
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          LOOP_GH_TOKEN: ${{ github.token }}
+        with:
+          api-level: 34
+          target: google_apis_playstore
+          arch: x86_64
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -memory 4096
+          script: bash loop/.github/loop/agent.sh
+      - name: Epilog
+        if: always() && steps.guard.outputs.go == 'true'
+        working-directory: loop
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 .github/loop/loop.py finalize "$ISSUE" "$WORK"
+
+  bench:
+    needs: prep
+    if: needs.prep.outputs.go == 'true' && needs.prep.outputs.kind == 'bench'
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ fromJSON(needs.prep.outputs.job_timeout) }}
+    env:
+      ISSUE: ${{ inputs.issue }}
+      ROLE: ${{ needs.prep.outputs.role }}
+      WORK: ${{ github.workspace }}/work
+      DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+      VARS_AUTOPILOT: ${{ vars.AUTOPILOT }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          path: loop
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prep.outputs.start }}
+          path: work
+          fetch-depth: 0
+      - run: |
+          pip install -q pyyaml numpy pillow
+          pip install -q torch --index-url https://download.pytorch.org/whl/cpu
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config --global author.name "Kucze3205"   # pętla działa w imieniu właściciela; bot zostaje committerem
+          git config --global author.email "kuczerowski2005@gmail.com"
+          git -C work checkout -q -B "task/$ISSUE"
+      - id: guard
+        working-directory: loop
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if python3 .github/loop/loop.py guard; then echo go=true >> "$GITHUB_OUTPUT"; else echo go=false >> "$GITHUB_OUTPUT"; fi
+      # bez sesji Claude'a: polecenia z `## Weryfikacja`, uruchamiane bez sekretów w środowisku
+      - if: steps.guard.outputs.go == 'true'
+        working-directory: loop
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 .github/loop/loop.py bench "$ISSUE" "$WORK"
+      - name: Epilog
+        if: always() && steps.guard.outputs.go == 'true'
+        working-directory: loop
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 .github/loop/loop.py finalize "$ISSUE" "$WORK"

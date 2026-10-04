@@ -1,0 +1,67 @@
+{
+  "sha": "43d1e7cf8035132ea52f67865c3473aefeda8741",
+  "dirty": false,
+  "issue": 17,
+  "status": "ok",
+  "blocked_reason": null,
+  "config": {
+    "n_seeds": 300,
+    "move_cap": 2000,
+    "epsilon": 0.0,
+    "torch_seed": 0,
+    "threshold_pct": 10.0,
+    "fixed_seed_file": "bench/seeds_fixed.json",
+    "rotated_seed_salt": 2654435761
+  },
+  "source_hashes": {
+    "scoring.py": "1e4a1b8730243ce6",
+    "pieces.py": "7d857149777bdab6"
+  },
+  "arms": {
+    "candidate": {
+      "policy": "greedy",
+      "fixed": {
+        "mean": 704.79,
+        "median": 486.0,
+        "p10": 160.0,
+        "survival_mean": 34.99,
+        "capped_pct": 0.0
+      },
+      "rotated": {
+        "mean": 690.36,
+        "median": 534.5,
+        "p10": 149.7,
+        "survival_mean": 35.31,
+        "capped_pct": 0.0
+      },
+      "overfit_gap_pct": 2.05
+    },
+    "previous": {
+      "policy": "random",
+      "fixed": {
+        "mean": 59.15,
+        "median": 46.0,
+        "p10": 31.0,
+        "survival_mean": 11.9,
+        "capped_pct": 0.0
+      },
+      "rotated": {
+        "mean": 62.12,
+        "median": 50.0,
+        "p10": 31.0,
+        "survival_mean": 12.17,
+        "capped_pct": 0.0
+      },
+      "overfit_gap_pct": -5.02
+    }
+  },
+  "deltas": {
+    "kandydat vs previous": {
+      "mean_diff": 645.63,
+      "pct": 1091.46,
+      "sd_diff": 811.33,
+      "label": "poprawa"
+    }
+  },
+  "duration_s": 7.6
+}
