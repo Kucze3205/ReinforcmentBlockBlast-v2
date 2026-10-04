@@ -1,17 +1,12 @@
 # blockblast-Self-Improvement-loop
 
-Instrukcja obsługi pętli agentów. Szczegóły (sekrety, etykiety, limity):
-[docs/loop-config.md](docs/loop-config.md).
+Szczegóły (sekrety, zmienne, uprawnienia): [docs/loop-config.md](docs/loop-config.md).
 
 ## Włączenie
 
 ```
 gh variable set AUTOPILOT --body on
-gh workflow run dispatch.yml -f issue=<N>
 ```
-
-`<N>` to issue z etykietą `rola:orchestrator`. Alternatywa: etykieta `ready`
-na dowolnym issue z etykietą `rola:*`.
 
 ## Wyłączenie
 

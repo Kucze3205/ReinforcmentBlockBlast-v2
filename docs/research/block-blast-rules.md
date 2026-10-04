@@ -65,7 +65,7 @@ To jest **jedyna** oficjalna wzmianka o combo i nie ma w niej żadnej semantyki 
 
 ### 2.1 [F] Dwie niezależne reimplementacje zbiegają się na tym samym wzorze
 
-To najważniejsze ustalenie tego biletu. Dwa niepowiązane projekty RL, pisane w różnych
+To najważniejsze ustalenie tego badania. Dwa niepowiązane projekty RL, pisane w różnych
 językach, przez różnych autorów, zawierają **matematycznie identyczny** wzór na
 czyszczenie linii.
 
@@ -259,7 +259,7 @@ gry Unity/IL2CPP" — [Il2CppInspector](https://github.com/djkaty/Il2CppInspecto
 [Il2CppDumper-based workflows](https://gist.github.com/BadMagic100/47096cbcf64ec0509cf75d48cfbdaea5) —
 bez ani jednego opracowania dotyczącego tej gry.
 
-> **To jest wynik negatywny i należy go zapisać jako taki: pytanie biletu o generator
+> **To jest wynik negatywny i należy go zapisać jako taki: pytanie o generator
 > jest publicznie nierozstrzygnięte.**
 
 ### 3.2 [F] Co robi najlepsza implementacja referencyjna — i dlaczego to nie dowód
@@ -528,7 +528,7 @@ potem zeruje ~33% komórek). Nie jest wywoływane z `game.py`.
 
 ## 6. Czego nie da się ustalić bez pomiarów na żywej apce
 
-To jest lista wymagań do biletu o **most do oryginału** (przechwytywanie stanu i wyniku
+To jest lista wymagań dla **mostu do oryginału** (przechwytywanie stanu i wyniku
 z działającej instalacji Block Blast). Uporządkowane od najtańszego/najbardziej
 rozstrzygającego.
 
@@ -559,7 +559,7 @@ rozstrzygającego.
   w trzech różnych dniach, na tej samej wersji apki.** Jeśli liczby się różnią,
   punktacja jest konfigurowana serwerowo i cała kalibracja wymaga innego podejścia.
   Logować: wersję apki, datę, identyfikator instalacji. **To jest wymaganie blokujące —
-  jeśli wynik wyjdzie niestacjonarny, bilety o kalibrację punktacji tracą sens
+  jeśli wynik wyjdzie niestacjonarny, kalibracja punktacji traci sens
   w obecnej formie.**
 
 ### Dobór klocków
@@ -594,16 +594,15 @@ rozstrzygającego.
 
 ---
 
-## 7. Wpływ na założenia mapy
+## 7. Wnioski dla projektu
 
-- **Nie unieważnia mapy.** Bilet zakładał, że `scoring.py` i `generator.py` to
-  rekonstrukcje — i to się potwierdziło w całej rozciągłości.
+- `scoring.py` i `generator.py` są rekonstrukcjami — to się potwierdziło w całej rozciągłości.
 - **Jedno założenie wymaga rewizji:** most do oryginału był traktowany jako narzędzie
   do *zmierzenia stałych*. Ostrzeżenie z §2.4 („different multipliers across nearby
   versions… apparent changes even within individual games") sugeruje, że stałych
   **może nie być**. Most musi najpierw odpowiedzieć na R10 (stacjonarność), zanim
   cokolwiek innego z niego wyciągniemy.
-- **Nowa informacja, której mapa nie przewidywała:** rozbieżność R-2/R-3 (combo
+- **Nowa informacja:** rozbieżność R-2/R-3 (combo
   addytywne i liczone na tackę zamiast mnożnika liczonego na postawienie) jest
   rozbieżnością **kształtu funkcji nagrody**, nie kalibracji. Dotychczasowe wyniki
   treningu agenta opisują grę, w której pogoń za combo się nie opłaca — a to według

@@ -18,7 +18,7 @@ Data badania: 2026-09-20
 4. **Trwałość stanu między jobami: TAK, ale przez `actions/cache`, nie przez artefakty** — i najpewniej przez **przeniesienie dysku AVD, nie snapshotu RAM**. Google pisze wprost, że *„snapshots are not reliable when software rendering is enabled"*, a my musimy renderować programowo. **[DOK]**, patrz §5.2.
 5. **Wybierz API ≥ 31.** Do API 30 każde `adb shell input` startowało nową JVM; od API 31 to cienki wrapper na `cmd`. Różnica rzędu wielkości w narzucie na ruch. **[ŹRÓDŁO]**, patrz §4.3.
 6. **Największe ryzyka nie są techniczne.** Obrazy z Google Play **nie dają roota** (udokumentowane), gra może nie wystartować bez GMS lub wykryć emulator, a ToS GitHuba zakazuje używania Actions do „działań niezwiązanych z projektem". Patrz §7 i §8.
-7. **Dwie rzeczy, które trafiają w założenia mapy, a nie dotyczą emulatora:** repo jest dziś **prywatne** (§1.1), a łańcuch „workflow tworzy issue → issue odpala workflow" **nie zadziała** z domyślnym `GITHUB_TOKEN` (§6.2).
+7. **Dwie rzeczy, które dotyczą pętli, a nie dotyczą emulatora:** repo jest dziś **prywatne** (§1.1), a łańcuch „workflow tworzy issue → issue odpala workflow" **nie zadziała** z domyślnym `GITHUB_TOKEN` (§6.2).
 
 ---
 
@@ -36,7 +36,7 @@ Data badania: 2026-09-20
 **[DOK]** — [GitHub-hosted runners](https://docs.github.com/en/actions/reference/runners/github-hosted-runners): *„Use of the standard GitHub-hosted runners is free and unlimited on public repositories."*
 **[DOK]** — [Billing for GitHub Actions](https://docs.github.com/billing/managing-billing-for-github-actions/about-billing-for-github-actions): *„GitHub Actions usage is free for self-hosted runners and for public repositories that use standard GitHub-hosted runners."*
 
-> **UWAGA — stan faktyczny w dniu badania.** `gh repo view --json visibility` zwraca `PRIVATE`. Dopóki repo jest prywatne, dostajemy **połowę CPU i RAM**, minuty są metrowane, a pula storage'u dla planu Free to 500 MB. Założenie mapy „repo staje się publiczne" nie jest wygodą — jest **warunkiem koniecznym** całej pętli.
+> **UWAGA — stan faktyczny w dniu badania.** `gh repo view --json visibility` zwraca `PRIVATE`. Dopóki repo jest prywatne, dostajemy **połowę CPU i RAM**, minuty są metrowane, a pula storage'u dla planu Free to 500 MB. Założenie „repo staje się publiczne" nie jest wygodą — jest **warunkiem koniecznym** całej pętli.
 
 `ubuntu-latest` mapuje się obecnie na **Ubuntu 24.04**. **[DOK]**
 
@@ -238,7 +238,7 @@ Czyli **rząd 1–3 ruchy/s naiwnie, może 5 ruchów/s po optymalizacji**.
 
 > **Najważniejsza obserwacja tej sekcji:** wąskim gardłem prawdopodobnie **nie jest ADB ani emulator, tylko czas stabilizacji ekranu po ruchu** — animacja spadania i znikania linii, renderowana programowo bez GPU (§3). Optymalizowanie ADB przed zmierzeniem tego składnika byłoby dopracowywaniem niewłaściwej rzeczy. **Zmierz krok 7 z §9.2, zanim cokolwiek przyspieszysz.**
 
-**Co to znaczy dla sesji:** przy 1,5 ruchu/s i jobie 5 h (§6.1) jedno ogniwo daje ~27 000 ruchów. Partia Block Blasta to rzędy setek–tysięcy ruchów, więc jedno ogniwo mieści wiele partii. **Do weryfikacji transferu to wystarcza z zapasem. Do treningu RL w prawdziwej grze — nie, i o tym mapa już wie** (warunek końca pętli jest zdefiniowany na symulatorze, nie na oryginale).
+**Co to znaczy dla sesji:** przy 1,5 ruchu/s i jobie 5 h (§6.1) jedno ogniwo daje ~27 000 ruchów. Partia Block Blasta to rzędy setek–tysięcy ruchów, więc jedno ogniwo mieści wiele partii. **Do weryfikacji transferu to wystarcza z zapasem. Do treningu RL w prawdziwej grze — nie** (trening idzie na symulatorze, a oryginał służy do weryfikacji).
 
 ### 4.5 Budżet danych
 
@@ -332,7 +332,7 @@ Wzorzec: job jako **ogniwo łańcucha**, nie jako całość sesji. Każde ogniwo
 
 > *„When you use the repository's GITHUB_TOKEN to perform tasks, events triggered by the GITHUB_TOKEN will not create a new workflow run"* — z wyjątkiem `workflow_dispatch` i `repository_dispatch`.
 
-Mapa zakłada: *„utworzenie issue z etykietą roli odpala sesję realizującą to issue. Orchestrator tworzy issues…"*. Z domyślnym `GITHUB_TOKEN` **to nie zadziała** — issue utworzone przez workflow nie odpali workflow na `issues: opened`. Pętla zatrzyma się po pierwszym obrocie.
+Pułapka dla pętli, która tworzy issues i oczekuje, że utworzenie issue z etykietą odpali sesję: z domyślnym `GITHUB_TOKEN` **to nie zadziała** — issue utworzone przez workflow nie odpali workflow na `issues: opened`. Pętla zatrzyma się po pierwszym obrocie.
 
 Obejścia **[DOK]**:
 - **PAT** (fine-grained) w sekrecie repo używany do `gh issue create`, albo
@@ -440,7 +440,7 @@ Pakiet: `com.block.juggle`, wydawca HungryStudio.
 
 ---
 
-## 8. Regulamin GitHuba — ryzyko, którego mapa nie nazywa
+## 8. Regulamin GitHuba — ryzyko łatwe do przeoczenia
 
 [GitHub Terms for Additional Products and Features](https://docs.github.com/en/site-policy/github-terms/github-terms-for-additional-products-and-features) zakazuje na GitHub-hosted runnerach **[DOK]**:
 
@@ -452,7 +452,7 @@ oraz
 
 Konsekwencje przy złamaniu: *„termination of jobs, restrictions in your ability to use GitHub Actions, disabling of repositories… or in some cases, suspension or termination of your GitHub account."*
 
-**Ocena [SZAC]:** trening agenta RL i testowanie mostu ADB **dla projektu, który jest w tym repo**, mieści się w „testing the software project". Ale pętla działająca 24/7 bez końca, zajmująca ciągle 20 równoległych darmowych jobów po 6 h, żeby bić rekord w komercyjnej grze, jest blisko granicy „disproportionate burden" i „unrelated activity". To ryzyko **tej samej klasy** co ryzyko bana konta w grze, które mapa już świadomie przyjęła — ale mapa go nie wymienia. Do decyzji właściciela, nie do rozstrzygnięcia w bilecie badawczym.
+**Ocena [SZAC]:** trening agenta RL i testowanie mostu ADB **dla projektu, który jest w tym repo**, mieści się w „testing the software project". Ale pętla działająca 24/7 bez końca, zajmująca ciągle 20 równoległych darmowych jobów po 6 h, żeby bić rekord w komercyjnej grze, jest blisko granicy „disproportionate burden" i „unrelated activity". To ryzyko **tej samej klasy** co ryzyko bana konta w grze, które właściciel już świadomie przyjął — ale to go nie wymienia. Do decyzji właściciela, nie do rozstrzygnięcia w bilecie badawczym.
 
 ---
 

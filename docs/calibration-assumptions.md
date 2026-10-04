@@ -150,7 +150,7 @@ inaczej to błąd odczytu, nie zmiana reguł.
 | co się stało | co robi pętla |
 |---|---|
 | pojedyncza rozbieżność w sesji | wpis do logu, nic więcej |
-| systematyczna: ≥2 w sesji albo ten sam wzorzec w dwóch sesjach | orchestrator dostaje pracę rekalibracyjną |
+| systematyczna: ≥2 w sesji albo ten sam wzorzec w dwóch sesjach | powstaje praca rekalibracyjna |
 
 Partii się **nie przerywa**: miara jest nasza, więc rozjazd licznika nie unieważnia
 partii weryfikacyjnej. Most wciąż loguje wersję apki, bo bez niej rozbieżności

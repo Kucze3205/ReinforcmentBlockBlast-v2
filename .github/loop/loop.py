@@ -5,7 +5,7 @@ Zero agenta. Uruchamiany zawsze z checkoutu gałęzi domyślnej, nigdy z gałęz
 zadania — agent nie może zmienić kodu, który go pilnuje. Leży w `.github/`, więc
 pętla nie może go edytować (zakaz 2 kontraktu pętli).
 
-Podpolecenia: guard, probe, route, resolve, export, publish, finalize, bench, watch, resume.
+Podpolecenia: guard, probe, route, export, publish, finalize, bench, watch, resume.
 """
 import json
 import os
@@ -24,8 +24,6 @@ BOT = "github-actions[bot]"
 # Pola raportu pisane wyłącznie przez epilog i dozorcę; publikacja raportu agenta ich nie kasuje.
 OWNED = ("proby", "wznow_po", "kopniecia", "kopniete", "konflikty", "przyczyna", "weryfikacja")
 AGENT_STATUSES = {"done", "partial", "blocked", "rejected"}
-MODEL_LABELS = {"model:opus": "claude-opus-5-5"}       # lista zamknięta; etykietę nadaje tylko orchestrator. Nowy model = sprawdź pin CLI w session.yml
-EFFORT_LABELS = {"effort:high": "high"}
 SECRETS = ("GH_TOKEN", "GITHUB_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN", "ASSETS_READ_TOKEN")
 BACKOFF_H = (1, 5, 24)                      # gdy w wyniku sesji nie ma terminu resetu limitu
 MAX_ATTEMPTS = 3        # próby wznowienia
@@ -272,60 +270,6 @@ def section(body, name):
 
 # ---------------------------------------------------------------- start sesji
 
-def load_profiles():
-    import yaml
-    with open(".claude/profiles.yml", encoding="utf-8") as fh:
-        return yaml.safe_load(fh)
-
-
-def frontmatter(role):
-    with open(".claude/skills/%s/SKILL.md" % role, encoding="utf-8") as fh:
-        text = fh.read()
-    m = re.match(r"---\n(.*?)\n---", text, re.S)
-    return dict(l.split(":", 1) for l in (m.group(1).splitlines() if m else []) if ":" in l)
-
-
-def check_profile(role, p):
-    """Zakaz 1: profil z internetem pisze wyłącznie do docs/. Zakaz 2 egzekwuje diff przy scalaniu."""
-    if p.get("internet") and any(not g.startswith("docs/") for g in p.get("write", [])):
-        return "profil `%s` ma naraz internet i zapis kodu (zakaz 1 kontraktu pętli)" % role
-    return None
-
-
-def resolve(n):
-    i = issue(n)
-    labels = label_names(i)
-    roles = sorted(l[5:] for l in labels if l.startswith("rola:"))
-    if i["state"] != "open" or len(roles) != 1 or not in_loop(labels):
-        raise SystemExit("issue %s: nieotwarte, poza pętlą (brak `%sN`) albo nie dokładnie jedna rola (%s)" % (n, ITER, roles))
-    role = roles[0]
-    p = load_profiles().get(role)
-    why = "brak profilu dla roli `%s` w .claude/profiles.yml" % role if not p else check_profile(role, p)
-    if not why and p.get("agent") is not False and not os.path.exists(".claude/skills/%s/SKILL.md" % role):
-        why = "brak skilla dla roli `%s`" % role
-    if why:
-        close_out(n, i, "blocked", {"przyczyna": "start:" + why.split()[0]}, "Sesja nie wystartowała: " + why + ".")
-        reconcile()
-        raise SystemExit(why)
-    branch = "task/%s" % n
-    m = re.search(r"<!-- start-branch: (\S+) -->", i["body"] or "")
-    has = subprocess.run(["git", "ls-remote", "--exit-code", "--heads", "origin", branch],
-                         capture_output=True).returncode == 0
-    start = branch if has else (m.group(1) if m else os.environ.get("DEFAULT_BRANCH", "main"))
-    if p.get("agent") is False:
-        kind, model, effort = "bench", "", ""
-    else:
-        fm = frontmatter(role)
-        model = next((v for k, v in MODEL_LABELS.items() if k in labels), fm.get("model", "claude-sonnet-5-5").strip())
-        effort = next((v for k, v in EFFORT_LABELS.items() if k in labels), fm.get("effort", "medium").strip())
-        kind = "emulator" if p.get("emulator") else "plain"
-    timeout = int(p.get("timeout_minutes", 120))
-    if kind == "emulator":
-        timeout = min(timeout, 300)     # limit joba 360 min zabija go jako FAILED; epilog musi zdążyć
-    edit_labels(n, remove=["blocked:rate-limit", "conflict"])
-    set_output(kind=kind, role=role, model=model, effort=effort, start=start,
-               tools=",".join(list(p.get("tools", [])) + ["Skill"]), max_turns=p.get("max_turns", 100),
-               agent_timeout=timeout, job_timeout=timeout + 40)
 
 
 # ---------------------------------------------------------------- dispatch
@@ -821,9 +765,6 @@ def main(argv):
         if not guard_ok():
             return 0
         launch(int(args[0]))
-        return 0
-    if cmd == "resolve":
-        resolve(int(args[0]))
         return 0
     if cmd == "export":
         export(int(args[0]), args[1])

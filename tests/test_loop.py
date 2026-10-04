@@ -1,4 +1,4 @@
-"""Testy czystej logiki pętli: raport, profile, przyczyna maszynowa, sekcje issue.
+"""Testy czystej logiki pętli: raport, przyczyna maszynowa, sekcje issue.
 
 Wywołania `gh` i przebiegi Actions sprawdza dopiero bieg na sucho.
 """
@@ -44,21 +44,6 @@ class RaportTest(unittest.TestCase):
         self.assertTrue(loop.trusted({"author_association": "NONE", "user": {"login": "github-actions[bot]"}}))
         self.assertFalse(loop.trusted({"author_association": "NONE", "user": {"login": "obcy"}}))
         self.assertFalse(loop.trusted({"author_association": "CONTRIBUTOR", "user": {"login": "obcy"}}))
-
-
-class ProfilTest(unittest.TestCase):
-    def test_zakaz_1_internet_i_kod(self):
-        self.assertIsNotNone(loop.check_profile("x", {"internet": True, "write": ["**"]}))
-        self.assertIsNotNone(loop.check_profile("x", {"internet": True, "write": ["docs/research/**", "bench/x.json"]}))
-        self.assertIsNone(loop.check_profile("x", {"internet": True, "write": ["docs/research/**"]}))
-        self.assertIsNone(loop.check_profile("x", {"internet": False, "write": ["**"]}))
-
-    def test_profile_repo_nie_lamia_zakazu(self):
-        import yaml
-        with open(os.path.join(ROOT, ".claude", "profiles.yml"), encoding="utf-8") as fh:
-            profiles = yaml.safe_load(fh)
-        for role, p in profiles.items():
-            self.assertIsNone(loop.check_profile(role, p), role)
 
 
 class PrzyczynaTest(unittest.TestCase):
@@ -313,17 +298,6 @@ class PoleWidzeniaTest(unittest.TestCase):
             self.assertEqual([x["number"] for x in loop.loop_open()], [2])
         finally:
             loop.api_list = orig
-
-    def test_resolve_odrzuca_issue_bez_petli_albo_roli(self):
-        orig = loop.issue
-        try:
-            for labels in ([], [{"name": "ready"}], [{"name": "rola:implementer"}, {"name": "rola:researcher"}],
-                           [{"name": "rola:implementer"}], [{"name": "loop:iteration 3"}]):
-                loop.issue = lambda n, l=labels: {"state": "open", "labels": l, "body": ""}
-                with self.assertRaises(SystemExit):
-                    loop.resolve(1)
-        finally:
-            loop.issue = orig
 
     def test_dispatch_na_labeled_tylko_dla_ready(self):
         with open(os.path.join(ROOT, ".github", "workflows", "dispatch.yml"), encoding="utf-8") as fh:

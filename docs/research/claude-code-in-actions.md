@@ -18,7 +18,7 @@ z `.claude/skills/` ładują się automatycznie po `actions/checkout`, a konkret
 się podając `/nazwa-skilla` jako `prompt` **[D]**. Model i poziom reasoning effort ustawia się
 per uruchomienie przez `claude_args` / `settings` / zmienne środowiskowe **[D]**.
 
-**Jedno założenie mapy jest nieprawdziwe.** Mapa zakłada: „sesja czeka i wznawia się po
+**Częste założenie jest nieprawdziwe:** że „sesja czeka i wznawia się po
 odnowieniu okna, zamiast paść". Mechanizm `autoContinueAtUsageLimit`, który to robi,
 **nie działa w trybie `-p`/nieinteraktywnym — dokumentacja wprost wyklucza „background
 sessions i `-p` runs"** **[D]**. Po wyczerpaniu limitu subskrypcji sesja w Actions **pada**,
@@ -26,7 +26,7 @@ a akcja rzuca wyjątkiem i job kończy się błędem **[K]**. Czekanie i wznawia
 zaimplementować **warstwę wyżej — w workflow**, nie w sesji. Sekcja 7 podaje gotowy
 mechanizm.
 
-Drugie, częściowo nieprawdziwe założenie mapy: „Limity są per rodzina modeli — wyczerpany
+Drugie, częściowo nieprawdziwe założenie: „Limity są per rodzina modeli — wyczerpany
 Opus nie blokuje Sonneta". To prawda tylko dla limitów `Opus limit` / `Sonnet limit`.
 Limit sesyjny (5 h) i tygodniowy (7 dni) są **wspólne dla wszystkich modeli** i przełączenie
 modelu ich nie omija **[D]**.
@@ -107,7 +107,7 @@ permissions:
 | brak inputu `prompt` | **interactive (tag)** | czeka na frazę `@claude` w issue/PR; postęp w komentarzu |
 | jest input `prompt` | **automation (agent)** | odpala się na dowolnym zdarzeniu GitHuba, wynik w logu joba |
 
-Pętla z mapy (issue z etykietą → sesja) to **tryb automation**.
+Pętla wyzwalana issue z etykietą (issue → sesja) to **tryb automation**.
 
 **[K] To istotna różnica dla uprawnień.** W trybie tag akcja sama dokłada
 `--permission-mode acceptEdits` i listę narzędzi bazowych (`src/modes/tag/index.ts`, l. 186).
@@ -126,7 +126,7 @@ którykolwiek test odpadnie:
   **Dotyczy to też `schedule`**: GitHub przypisuje przebieg cron użytkownikowi, który ostatnio
   zmienił harmonogram; jeśli to bot, trzeba go wymienić w `allowed_bots`.
 
-**Konsekwencja dla pętli z mapy [Z]:** jeśli issues tworzy orchestrator działający jako
+**Konsekwencja dla takiej pętli [Z]:** jeśli issues tworzy orchestrator działający jako
 `github-actions[bot]` lub aplikacja GitHub, sesja wyzwolona przez takie issue **zostanie
 odrzucona**, dopóki nie doda się tego bota do `allowed_bots`. To trzeba przetestować
 empirycznie przed uzbrojeniem pętli.
@@ -195,8 +195,8 @@ a frontmatter skilla jako dodatek.
 Claude Code. Aliasy: `default`, `best`, `fable`, `opus`, `sonnet`, `haiku`, `opusplan`.
 Alias `default` to model zależny od typu konta (Opus 5 dla Max/Enterprise/API, Sonnet 5 dla Pro).
 
-Mapa chce Sonneta 5 jako konia roboczego i Opusa 5 rzadko → `--model sonnet` domyślnie,
-`--model opus` dla biletów wymagających.
+Sonnet 5 jako koń roboczy i Opus 5 rzadko → `--model sonnet` domyślnie,
+`--model opus` dla zadań wymagających.
 
 ### 5.2 Effort level
 
@@ -336,7 +336,7 @@ jeden zryw (np. duże rozgałęzienie workflowów) potrafi wyczerpać tydzień p
 
 ### 7.2 `autoContinueAtUsageLimit` — nie działa w Actions
 
-**[D]** Mechanizm istnieje i robi dokładnie to, czego chce mapa: czeka w otwartej sesji
+**[D]** Mechanizm istnieje i robi dokładnie to, czego pętla potrzebuje: czeka w otwartej sesji
 i sam podejmuje przerwane zadanie po resecie (domyślnie włączony, wymaga v2.1.234+).
 **Ale dokumentacja wprost wymienia, gdzie Claude Code tego czekania w ogóle nie oferuje:**
 
@@ -414,11 +414,11 @@ Reset limitu sesyjnego jest ≤ 5 h, a job GitHub-hosted może żyć 6 h **[D]**
 `reset − teraz + margines` mieści się w pozostałym budżecie joba, można po prostu `sleep`
 i odpalić **drugi krok** akcji z `--resume ${{ steps.claude.outputs.session_id }}`.
 Transkrypt sesji leży na tym samym runnerze, więc `--resume` ma czego szukać **[Z — logiczne,
-ale nietestowane]**. To rozwiązanie najbliższe temu, czego chce mapa: **sesja realnie
+ale nietestowane]**. To rozwiązanie najbliższe temu, czego pętla potrzebuje: **sesja realnie
 podejmuje przerwane zadanie**.
 
 Koszt: minuty Actions lecą podczas `sleep`. Dla repo publicznego minuty są darmowe, więc
-zgodnie z założeniem mapy jest to akceptowalne **[D]**.
+przy publicznym repo jest to akceptowalne **[D]**.
 
 **Poziom B — przełożenie na później (limit tygodniowy, reset > budżet joba).**
 Job nie ma szans doczekać. Wtedy: zapisz stan (gałąź z commitami Claude'a już istnieje),

@@ -1,4 +1,4 @@
-# Sesja pętli. Wejście zawsze jedno: numer issue. Rola, model i budżet z etykiet + .claude/profiles.yml.
+# Sesja pętli. Wejście zawsze jedno: numer issue. Krok `resolve` (rola, model i budżet) usunięty wraz z profilami — do przepisania we wdrożeniu.
 # Nie wołaj wprost — wejście publiczne to dispatch.yml (walidacja, deduplikacja).
 #
 # Kod pętli (.github/loop/) biegnie z checkoutu gałęzi domyślnej (`loop/`), agent pracuje w osobnym
