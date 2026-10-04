@@ -225,6 +225,49 @@ węzły w toku dokańczają się same.
 
 ---
 
+## Faza offline — `offline.yml`, `offline.sh`, `offline.py`, `.github/policy/meta.md`
+
+```bash
+gh workflow run offline.yml -f drzewo=<t>   # ręcznie; zwykle dispatchuje ją krok harmonogramu po zamknięciu drzewa
+```
+
+Po zamkniętym drzewie powstaje M wersji polityki (`config.json`), każdą pisze osobna, świeża sesja.
+Runner liczy `V` każdej wersji, wybiera najlepszą razem z bieżącą i wdraża ją. Grupa `polityka`
+trzyma następne drzewo, aż faza skończy; na końcu `drzewo.yml` bez argumentu otwiera je.
+`AUTOPILOT` sprawdza tylko start jobu: przestawienie na `off` w trakcie nie przerywa fazy,
+ale po niej drzewo już się nie otworzy.
+
+| Co | Zasada |
+|---|---|
+| odtworzenie | `offline.odtworz`: ta sama `solve`, `Pytanie`, `paczka`, `nazwij`, `czas_h`, `wartosc` co na żywo; `question` ujawnia zapisane węzły (`oceniony`) zamiast uruchamiać sesje |
+| nowy łańcuch | najwcześniej utworzony (`kolejnosc`) korzeń nagrania, jeszcze nieużyty; bez korzeni runda się nie liczy |
+| węzeł spoza nagrania | łańcuch kończy się (znika z `legal_actions()`), bez kary w `T`; runda bez żadnego ujawnienia nie liczy się do `K` |
+| `V` wersji | średnia z `V` po wszystkich zamkniętych drzewach (`trees/<n>.json` z `koniec`), `V = max s_v − beta·T` jak na żywo |
+| dopuszczenie | odtworzenie w osobnym procesie, bez środowiska, limit 600 s, dwa przebiegi muszą dać to samo; wyjątek, brak `solve`, nie-lista, zwłoka albo losowość to `blad` i wersja nie wygrywa |
+| wybór | argmax `V`; remis zostawia wcześniejszą, więc bieżącą (`V` zwycięzcy ≥ `V` bieżącej) |
+| wdrożenie | `.github/policy/policy.py` tylko gdy wygrała inna niż bieżąca; zawsze archiwum fazy `.github/policy/history/faza-<t>/r####/` (`policy.py`, `wynik.json`) |
+| awaria | bez commita zostaje poprzednia polityka, a pętla idzie dalej (`drzewo.yml` jest wołany zawsze, o ile sonda poświadczenia przeszła) |
+
+**Sesja meta** (`offline.sh`, model `claude-sonnet-5-5`, `--effort high`, sufit 80 min i 80 tur na wersję, jedno
+czekanie na reset limitu subskrypcji do 4 h). Prompt to `.github/policy/meta.md` skopiowany jako `ZADANIE.md`. Dysk
+sesji to katalog `meta/` w `$RUNNER_TEMP`: `policy.py` (najlepsza dotąd wersja, jedyny plik, który się liczy),
+`history/biezaca/r####/` (wersje tej fazy z `V`, `V_drzewa` i śladami odtworzenia), `history/faza-*/`
+(wersje wcześniejszych faz, bez śladów), `drzewa/<t>/manifest.json` (struktura, `s_v`, `kolejnosc`, `koszt_h`;
+bez kodu i bez notatek), `baseline.json`, `konfiguracja.json` (`W`, `K`, `beta`). Narzędzia: czytanie i edycja
+w katalogu sesji; `Bash`, internet i subagenci wyłączone. W środowisku sesji nie ma tokenu GitHuba (krok
+sesji dostaje tylko `CLAUDE_CODE_OAUTH_TOKEN`, a Claude Code zdejmuje go z procesów potomnych). Granica to
+katalog roboczy, nie osobny użytkownik: sesje meta nie mają Basha, więc nic nie wykonują poza
+odczytem i edycją plików.
+
+**Podsumowanie jobu** (`$GITHUB_STEP_SUMMARY`): wersje z `V`, `V` per drzewo, skrótem i błędem; zmiana polityki tak/nie;
+zgodność odtworzenia z żywym drzewem (tam, gdzie drzewo szło tą samą polityką: `koniec.V` kontra `V` bieżącej
+wersji); **postęp** drzewa (po rundzie: najlepszy `s_v`, `T`, `V`); **czasy węzłów** (sesja, oczekiwanie,
+liczba sesji z podziałem na kontynuacje po turach i po limicie, tury, symulator, seria). To z niej właściciel
+koryguje `W` i `K` w `config.json`. Katalog `offline/` (wersje i ślady) i transkrypty sesji są w artefakcie
+`offline-<t>-<run>-<próba>`.
+
+---
+
 ## Węzeł — `wezel.yml`
 
 ```bash

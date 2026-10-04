@@ -1,0 +1,75 @@
+# Faza offline po zamkniętym drzewie: M wersji polityki, V każdej na wszystkich zapisanych drzewach, argmax
+# razem z bieżącą wersją i wdrożenie zwycięzcy na gałąź domyślną. Dispatchuje ją krok harmonogramu drzewa
+# (`drzewo.yml`); ręcznie: `gh workflow run offline.yml -f drzewo=<t>`. Na końcu wywołuje `drzewo.yml`
+# bez argumentu, co otwiera następne drzewo. `AUTOPILOT` sprawdza tylko na starcie: przestawienie na `off`
+# w trakcie nie przerywa fazy w połowie. Kontrakt: docs/loop-config.md.
+name: offline
+run-name: offline po drzewie ${{ inputs.drzewo }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      drzewo:
+        description: Numer właśnie zamkniętego drzewa
+        required: true
+
+# jedna grupa z harmonogramem drzewa: następne drzewo czeka, aż faza offline skończy
+concurrency:
+  group: polityka
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  actions: write
+
+env:
+  DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+  GH_REPO: ${{ github.repository }}
+
+jobs:
+  offline:
+    if: vars.AUTOPILOT == 'on'
+    runs-on: ubuntu-latest
+    # M sesji po najwyżej 80 min (plus jedno czekanie na limit) i odtworzenia; limit jobu to 6 h
+    timeout-minutes: 355
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+      # martwe poświadczenie kończy job, zanim cokolwiek zapisze, i nie otwiera następnego drzewa
+      - id: sonda
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+        run: python3 .github/loop/loop.py probe
+      - name: Sesje meta i wybór wersji
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+        run: |
+          set -eu
+          npm install -g @anthropic-ai/claude-code@2.1.289
+          cp .github/loop/stream_filter.py "$RUNNER_TEMP/"
+          bash .github/loop/offline.sh "${{ inputs.drzewo }}"
+      # sesje meta nie widzą tokenu GitHuba; zapis na gałąź domyślną robi osobny krok bez poświadczenia Claude
+      - name: Zapis zwycięzcy i archiwum
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          bash .github/loop/zapisz.sh "offline po drzewie ${{ inputs.drzewo }}: polityka i archiwum" .github/policy
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: offline-${{ inputs.drzewo }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/offline/
+            ${{ runner.temp }}/sesja-*/stream.ndjson
+          if-no-files-found: ignore
+      # awaria fazy nie wstrzymuje pętli: bez commita zostaje poprzednia polityka
+      - name: Następne drzewo
+        if: always() && steps.sonda.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run drzewo.yml --ref "$DEFAULT_BRANCH"
