@@ -1,4 +1,4 @@
-# ReinforcmentBlockBlast
+# blockblast-agent-loop
 
 Instrukcja obsługi pętli agentów. Szczegóły (sekrety, etykiety, limity):
 [docs/loop-config.md](docs/loop-config.md).

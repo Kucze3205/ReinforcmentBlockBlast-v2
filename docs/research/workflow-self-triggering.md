@@ -1,6 +1,5 @@
 # Samowyzwalanie workflow: co jest potrzebne, żeby pętla się nie zatrzymała
 
-Bilet badawczy: [#5](https://github.com/Kucze3205/ReinforcmentBlockBlast/issues/5). Mapa nadrzędna: [#1](https://github.com/Kucze3205/ReinforcmentBlockBlast/issues/1).
 Data badania: 2026-09-20. Wszystkie cytaty pochodzą z oficjalnej dokumentacji GitHuba (`docs.github.com`, źródła w `github/docs`) oraz z repozytoriów akcji należących do GitHuba.
 
 Legenda wiarygodności użyta w całym dokumencie:
@@ -276,7 +275,7 @@ Plus, w repo: zmienna `APP_CLIENT_ID` i sekret `APP_PRIVATE_KEY`.
 
 ### Gdyby opcja C (PAT fine-grained) — uprawnienia tokenu
 
-**[POTWIERDZONE]** Resource owner: `Kucze3205`. Repository access: **Only select repositories → `ReinforcmentBlockBlast`**. Permissions: `Metadata: Read-only` (wymuszone), `Issues: Read and write`, `Contents: Read and write`, `Actions: Read and write`, opcjonalnie `Pull requests: Read and write`, `Variables: Read and write`.
+**[POTWIERDZONE]** Resource owner: `Kucze3205`. Repository access: **Only select repositories → to repo**. Permissions: `Metadata: Read-only` (wymuszone), `Issues: Read and write`, `Contents: Read and write`, `Actions: Read and write`, opcjonalnie `Pull requests: Read and write`, `Variables: Read and write`.
 
 ---
 

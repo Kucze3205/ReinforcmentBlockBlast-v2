@@ -1,6 +1,5 @@
 # Jak prawdziwy Block Blast punktuje i dobiera klocki
 
-Bilet: [#2](https://github.com/Kucze3205/ReinforcmentBlockBlast/issues/2) · mapa: #1
 Data badania: 2026-09-20
 
 Gra: **Block Blast!** (`com.block.juggle`), wydawca **Hungry Studio / ARETIS LIMITED**.
@@ -595,7 +594,7 @@ rozstrzygającego.
 
 ---
 
-## 7. Wpływ na założenia mapy (#1)
+## 7. Wpływ na założenia mapy
 
 - **Nie unieważnia mapy.** Bilet zakładał, że `scoring.py` i `generator.py` to
   rekonstrukcje — i to się potwierdziło w całej rozciągłości.

@@ -1,6 +1,5 @@
 # Emulator Androida w GitHub Actions: instalacja APK, sterowanie, trwałość stanu
 
-Bilet badawczy: [#3](https://github.com/Kucze3205/ReinforcmentBlockBlast/issues/3) · Mapa: [#1](https://github.com/Kucze3205/ReinforcmentBlockBlast/issues/1)
 Data badania: 2026-09-20
 
 > **Konwencja oznaczeń.** Każde twierdzenie ma etykietę:
@@ -19,7 +18,7 @@ Data badania: 2026-09-20
 4. **Trwałość stanu między jobami: TAK, ale przez `actions/cache`, nie przez artefakty** — i najpewniej przez **przeniesienie dysku AVD, nie snapshotu RAM**. Google pisze wprost, że *„snapshots are not reliable when software rendering is enabled"*, a my musimy renderować programowo. **[DOK]**, patrz §5.2.
 5. **Wybierz API ≥ 31.** Do API 30 każde `adb shell input` startowało nową JVM; od API 31 to cienki wrapper na `cmd`. Różnica rzędu wielkości w narzucie na ruch. **[ŹRÓDŁO]**, patrz §4.3.
 6. **Największe ryzyka nie są techniczne.** Obrazy z Google Play **nie dają roota** (udokumentowane), gra może nie wystartować bez GMS lub wykryć emulator, a ToS GitHuba zakazuje używania Actions do „działań niezwiązanych z projektem". Patrz §7 i §8.
-7. **Dwie rzeczy, które trafiają w założenia mapy #1, a nie dotyczą emulatora:** repo jest dziś **prywatne** (§1.1), a łańcuch „workflow tworzy issue → issue odpala workflow" **nie zadziała** z domyślnym `GITHUB_TOKEN` (§6.2).
+7. **Dwie rzeczy, które trafiają w założenia mapy, a nie dotyczą emulatora:** repo jest dziś **prywatne** (§1.1), a łańcuch „workflow tworzy issue → issue odpala workflow" **nie zadziała** z domyślnym `GITHUB_TOKEN` (§6.2).
 
 ---
 
@@ -329,11 +328,11 @@ Wzorzec: job jako **ogniwo łańcucha**, nie jako całość sesji. Każde ogniwo
 
 ### 6.2 Łańcuch jobów — ukryta blokada
 
-**To jest najważniejsza pułapka dla pętli z mapy #1.** Dokumentacja GitHuba **[DOK]** ([trigger a workflow](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/trigger-a-workflow)):
+**To jest najważniejsza pułapka dla pętli.** Dokumentacja GitHuba **[DOK]** ([trigger a workflow](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/trigger-a-workflow)):
 
 > *„When you use the repository's GITHUB_TOKEN to perform tasks, events triggered by the GITHUB_TOKEN will not create a new workflow run"* — z wyjątkiem `workflow_dispatch` i `repository_dispatch`.
 
-Mapa #1 zakłada: *„utworzenie issue z etykietą roli odpala sesję realizującą to issue. Orchestrator tworzy issues…"*. Z domyślnym `GITHUB_TOKEN` **to nie zadziała** — issue utworzone przez workflow nie odpali workflow na `issues: opened`. Pętla zatrzyma się po pierwszym obrocie.
+Mapa zakłada: *„utworzenie issue z etykietą roli odpala sesję realizującą to issue. Orchestrator tworzy issues…"*. Z domyślnym `GITHUB_TOKEN` **to nie zadziała** — issue utworzone przez workflow nie odpali workflow na `issues: opened`. Pętla zatrzyma się po pierwszym obrocie.
 
 Obejścia **[DOK]**:
 - **PAT** (fine-grained) w sekrecie repo używany do `gh issue create`, albo

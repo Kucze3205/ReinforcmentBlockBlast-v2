@@ -1,6 +1,5 @@
 # Claude Code w GitHub Actions: sesje nieinteraktywne, skille z repo, rate limit
 
-Bilet: [#4](https://github.com/Kucze3205/ReinforcmentBlockBlast/issues/4). Mapa: [#1](https://github.com/Kucze3205/ReinforcmentBlockBlast/issues/1).
 Data badania: 2026-09-20. Wersja akcji: `anthropics/claude-code-action@v1` (stan `main`).
 
 Każde twierdzenie jest oznaczone:

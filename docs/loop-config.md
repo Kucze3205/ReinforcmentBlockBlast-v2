@@ -1,8 +1,5 @@
 # Konfiguracja pętli — sekrety, zmienne, etykiety, uprawnienia
 
-Bilet: [#13](https://github.com/Kucze3205/ReinforcmentBlockBlast/issues/13) · mapa: [#1](https://github.com/Kucze3205/ReinforcmentBlockBlast/issues/1)
-Źródła ustaleń: [#4](https://github.com/Kucze3205/ReinforcmentBlockBlast/issues/4) (uwierzytelnianie), [#5](https://github.com/Kucze3205/ReinforcmentBlockBlast/issues/5) (samowyzwalanie i uprawnienia), [#7](https://github.com/Kucze3205/ReinforcmentBlockBlast/issues/7) (role)
-
 Kontrakt nazw między workflowami a sesjami. Workflow, który odwołuje się do nazwy
 spoza tej listy, jest błędem — nie okazją do dopisania nowej nazwy bez decyzji.
 
@@ -15,13 +12,13 @@ spoza tej listy, jest błędem — nie okazją do dopisania nowej nazwy bez decy
 | `CLAUDE_CODE_OAUTH_TOKEN` | Jedyne poświadczenie generowane ręcznie. Uwierzytelnia sesje Claude Code subskrypcją właściciela. Powstaje z `claude setup-token`, ważny rok. |
 
 Do samowyzwalania pętli **nie ma sekretu** — wystarcza wbudowany `GITHUB_TOKEN`
-w parze z `workflow_dispatch` ([#5](https://github.com/Kucze3205/ReinforcmentBlockBlast/issues/5)). Żadnego PAT-a, żadnego klucza GitHub App.
+w parze z `workflow_dispatch`. Żadnego PAT-a, żadnego klucza GitHub App.
 
 ### `ANTHROPIC_API_KEY` — zakaz
 
 Ta nazwa **nie może istnieć** ani jako sekret, ani jako zmienna, ani w `env:`
 żadnego joba. Ma udokumentowane pierwszeństwo nad tokenem subskrypcji i cicho
-przekieruje rachunek na płatne API ([#4](https://github.com/Kucze3205/ReinforcmentBlockBlast/issues/4)). Cisza jest tu najgorsza — nic się nie zepsuje,
+przekieruje rachunek na płatne API. Cisza jest tu najgorsza — nic się nie zepsuje,
 tylko przyjdzie faktura.
 
 ---
@@ -40,7 +37,7 @@ if: vars.AUTOPILOT == 'on'
 ```
 
 **Czego `AUTOPILOT` nie potrafi:** pętla nie może go przestawić sama. Klucz
-`permissions` nie zna zakresu pozwalającego zapisać zmienną repo ([#5](https://github.com/Kucze3205/ReinforcmentBlockBlast/issues/5)). To
+`permissions` nie zna zakresu pozwalającego zapisać zmienną repo. To
 przełącznik człowieka, nie bezpiecznik. Stan awaryjny, który pętla ustawia sobie
 sama, musi leżeć w pliku w repo albo w przypiętym issue.
 
@@ -50,7 +47,7 @@ sama, musi leżeć w pliku w repo albo w przypiętym issue.
 
 Etykieta na issue wybiera zachowanie workflow. Jeden prefiks `rola:` dla wszystkiego,
 co wybiera rolę; lista **nie jest zamknięta** — orchestrator dokłada nowe role jako
-`rola:<nazwa>` bez tykania workflowów, bo rola to para skill + profil z `.claude/profiles.yml` ([#7](https://github.com/Kucze3205/ReinforcmentBlockBlast/issues/7)).
+`rola:<nazwa>` bez tykania workflowów, bo rola to para skill + profil z `.claude/profiles.yml`.
 
 | Etykieta | Znaczenie |
 |---|---|
@@ -63,7 +60,7 @@ co wybiera rolę; lista **nie jest zamknięta** — orchestrator dokłada nowe r
 ### Nadpisania — lista zamknięta
 
 Domyślnie Sonnet 5.5 (`claude-sonnet-5-5`) / effort medium. Etykietę nadaje **wyłącznie orchestrator**,
-nigdy sesja sama sobie ([#7](https://github.com/Kucze3205/ReinforcmentBlockBlast/issues/7)).
+nigdy sesja sama sobie.
 
 | Etykieta | Nadpisuje |
 |---|---|
@@ -75,13 +72,13 @@ nigdy sesja sama sobie ([#7](https://github.com/Kucze3205/ReinforcmentBlockBlast
 | Etykieta | Znaczenie |
 |---|---|
 | `loop:iteration <n>` | Numer cyklu orchestratora (`docs/journal/cykl-NNNN.md`), w którym powstało issue. Każde issue pętli ją niesie; następca dziedziczy ją po rodzicu, a issue założone przez dozorcę dostaje ostatni numer + 1. Jest **bramką pola widzenia** pętli (patrz „Pole widzenia pętli”); rolę nadal wybiera `rola:*`. Człowiek, który chce puścić własne issue przez `ready`, dodaje obie: `rola:*` i `loop:iteration N`. |
-| `loop:map` | Issue złączeniowe cyklu jako mapa cyklu (#63): sub-issues to zadania cyklu, body to indeks decyzji. Informacyjna — pętla jej nie czyta; pole widzenia i rolę nadal dają `loop:iteration N` i `rola:*`. |
+| `loop:map` | Issue złączeniowe cyklu jako mapa cyklu: sub-issues to zadania cyklu, body to indeks decyzji. Informacyjna — pętla jej nie czyta; pole widzenia i rolę nadal dają `loop:iteration N` i `rola:*`. |
 
 ### Stan
 
 | Etykieta | Znaczenie |
 |---|---|
-| `conflict` | Merge nieudany. Issue zostaje **otwarte** i odpala się ponownie ze świeżego HEAD. Konflikt nie jest porażką zadania ([#7](https://github.com/Kucze3205/ReinforcmentBlockBlast/issues/7)). |
+| `conflict` | Merge nieudany. Issue zostaje **otwarte** i odpala się ponownie ze świeżego HEAD. Konflikt nie jest porażką zadania. |
 
 ---
 
@@ -89,7 +86,7 @@ nigdy sesja sama sobie ([#7](https://github.com/Kucze3205/ReinforcmentBlockBlast
 
 **Pętla widzi i dotyka wyłącznie issues z etykietą `loop:iteration N` (oraz z jedną `rola:*`, która mówi, kogo uruchomić).** Sama `rola:*` ani sama `ready` nie wystarcza. Właściciel
 może w tym samym repo prowadzić własne issues i branche (np. wayfinderowe) — pętla ich nie ruszy
-([#65](https://github.com/Kucze3205/ReinforcmentBlockBlast/issues/65)). Gwarantują to cztery miejsca, pilnowane testami w `tests/test_loop.py`:
+. Gwarantują to cztery miejsca, pilnowane testami w `tests/test_loop.py`:
 
 | Miejsce | Zachowanie |
 |---|---|
@@ -121,14 +118,14 @@ requests"**, siedzący tuż pod Workflow permissions. Nazwa mówi o zatwierdzani
 jedna opcja gasi **dwie** rzeczy: `GITHUB_TOKEN` nie może PR-a zatwierdzić **ani go
 otworzyć**.
 
-**Rozstrzygnięte w [#16](https://github.com/Kucze3205/ReinforcmentBlockBlast/issues/16): pętla nie otwiera PR-ów.** PR był tylko
+**Rozstrzygnięte: pętla nie otwiera PR-ów.** PR był tylko
 powierzchnią audytu, bo epilog i tak merguje bezwarunkowo, a benchmark jest
-nieblokujący ([#8](https://github.com/Kucze3205/ReinforcmentBlockBlast/issues/8)). Epilog robi rebase `task/<n>` i pushuje na gałąź domyślną po zielonych
+nieblokujący. Epilog robi rebase `task/<n>` i pushuje na gałąź domyślną po zielonych
 testach; audyt to `git log`. Checkbox zostaje wyłączony na stałe, `pull-requests: write`
-i migracja na GitHub App z [#5](https://github.com/Kucze3205/ReinforcmentBlockBlast/issues/5) znikają z planu.
+i migracja na GitHub App znikają z planu.
 
 Skoro domyślne to `read`, **każdy workflow musi jawnie zadeklarować `permissions:`**.
-Minimalne zestawy z [#5](https://github.com/Kucze3205/ReinforcmentBlockBlast/issues/5):
+Minimalne zestawy:
 
 | Workflow | `permissions:` |
 |---|---|
@@ -139,7 +136,7 @@ Minimalne zestawy z [#5](https://github.com/Kucze3205/ReinforcmentBlockBlast/iss
 
 Osobno, niezależnie od `permissions:`: tryb automation Claude Code **nie nadaje
 żadnych uprawnień narzędziowych**. Każdy job musi podać `--permission-mode` i pełną
-listę `--allowedTools` ([#4](https://github.com/Kucze3205/ReinforcmentBlockBlast/issues/4)).
+listę `--allowedTools`.
 
 ---
 
@@ -153,12 +150,12 @@ sprawdzić z poziomu sesji — stan poniżej jest deklaracją właściciela, nie
 | Send write tokens to workflows from pull requests | **wyłączone** (repo jest publiczne) |
 | Require approval for all external contributors | **włączone** (przebiegi z forków) |
 
-Oba potwierdzone przez właściciela 2026-09-20 przy zamykaniu [#13](https://github.com/Kucze3205/ReinforcmentBlockBlast/issues/13). Jeśli kiedyś przestaną się
+Oba potwierdzone przez właściciela 2026-09-20. Jeśli kiedyś przestaną się
 zgadzać, nikt tego nie zauważy automatycznie — dlatego przegląd tych dwóch pozycji
 należy do raportu tygodniowego, gdy ten powstanie.
 
 Sekrety repo — w tym `CLAUDE_CODE_OAUTH_TOKEN` — i tak **nie są** przekazywane do
-przebiegów z forkowych PR-ów ([#5](https://github.com/Kucze3205/ReinforcmentBlockBlast/issues/5)).
+przebiegów z forkowych PR-ów.
 
 ---
 
@@ -170,8 +167,8 @@ udokumentowane ograniczenia GitHuba, z których żadne nie ma obejścia:
 
 | Ograniczenie | Skutek |
 |---|---|
-| *„Workflow runs cannot restore caches created for child branches or sibling branches"* — run czyta cache z własnej gałęzi **albo z domyślnej** | Stan emulatora, który wg [#3](https://github.com/Kucze3205/ReinforcmentBlockBlast/issues/3) jedzie przez `actions/cache`, nie przechodzi między gałęziami siostrzanymi |
-| Workflow na zdarzeniu `issues` odpala się **wyłącznie z pliku na gałęzi domyślnej**; `workflow_dispatch` jest na tej samej liście widoczny dopiero stamtąd | Ludzka ścieżka wejścia `issues: [labeled]` z [#5](https://github.com/Kucze3205/ReinforcmentBlockBlast/issues/5) nie działa, dopóki workflowy leżą poza gałęzią domyślną |
+| *„Workflow runs cannot restore caches created for child branches or sibling branches"* — run czyta cache z własnej gałęzi **albo z domyślnej** | Stan emulatora, który wg ustaleń jedzie przez `actions/cache`, nie przechodzi między gałęziami siostrzanymi |
+| Workflow na zdarzeniu `issues` odpala się **wyłącznie z pliku na gałęzi domyślnej**; `workflow_dispatch` jest na tej samej liście widoczny dopiero stamtąd | Ludzka ścieżka wejścia `issues: [labeled]` nie działa, dopóki workflowy leżą poza gałęzią domyślną |
 
 ### Nazwa nie jest wpisywana na sztywno
 
@@ -186,7 +183,7 @@ w ustawieniach repo — bez dotykania jednego pliku workflow.
 
 ### Stan emulatora: dwie warstwy cache'u
 
-Sesja pracuje na `task/<n>` ([#7](https://github.com/Kucze3205/ReinforcmentBlockBlast/issues/7)), więc **zapisuje** cache wyłącznie w zasięgu własnej
+Sesja pracuje na `task/<n>`, więc **zapisuje** cache wyłącznie w zasięgu własnej
 gałęzi — ale **czyta** także z gałęzi domyślnej. Stąd podział:
 
 | Warstwa | Zasięg | Co niesie | Żywotność |
@@ -200,12 +197,10 @@ potrzebna.
 
 **Merge na gałąź pętli w trakcie sesji weryfikacyjnej nie unieważnia jej cache'u.**
 Wpis cache'u jest związany z kluczem i gałęzią, nie z commitem, a sesja siedzi na
-własnym `task/<n>`, którego merge na gałąź domyślną nie dotyka. Pytanie z
-[#24](https://github.com/Kucze3205/ReinforcmentBlockBlast/issues/24) zamknięte przecząco.
+własnym `task/<n>`, którego merge na gałąź domyślną nie dotyka. Pytanie o to zamknięte przecząco.
 
 Klucze muszą być nowe przy każdym zapisie (`avd-<warstwa>-${{ github.run_id }}`)
-i odczytywane przez `restore-keys`, bo wpis o danym kluczu jest niemutowalny
-([#3](https://github.com/Kucze3205/ReinforcmentBlockBlast/issues/3) §5.3).
+i odczytywane przez `restore-keys`, bo wpis o danym kluczu jest niemutowalny (§5.3 badania cache).
 
 ---
 
@@ -221,8 +216,7 @@ pracuje w osobnym checkoutcie zadania (`work/`) — agent nie zmienia kodu, któ
 | `session.yml` | `workflow_dispatch(issue)` | `prep` (dozór, sonda, rola → profil, model, budżet) → jeden z trzech kształtów: `plain`, `emulator`, `bench`. Każdy kończy krokiem **Epilog** (`if: always()`). |
 | `watchdog.yml` | cron co 30 min | Bramka `awaria`, sonda, cztery liczniki, kopnięcia. Czerwony przebieg = mail. |
 
-Odblokowanie dependentów robi sam epilog (w procesie, po zamknięciu issue) — osobny
-`unblock.yml` z [#6](https://github.com/Kucze3205/ReinforcmentBlockBlast/issues/6) odpadł, bo epilog ma te same uprawnienia i to samo wywołanie.
+Odblokowanie dependentów robi sam epilog (w procesie, po zamknięciu issue) — osobny `unblock.yml` odpadł, bo epilog ma te same uprawnienia i to samo wywołanie.
 
 ### Wejście i wyjście agenta
 
@@ -260,7 +254,7 @@ Zero otwartych issues to zator: dozorca zakłada issue `rola:orchestrator` ze sz
 
 ### Licznik strat na okno
 
-Piąty licznik, ale **nie dozorcy, tylko orchestratora** ([#36](https://github.com/Kucze3205/ReinforcmentBlockBlast/issues/36), [#39](https://github.com/Kucze3205/ReinforcmentBlockBlast/issues/39)): most stanął na nieznanym
+Piąty licznik, ale **nie dozorcy, tylko orchestratora**: most stanął na nieznanym
 oknie, a jego `NNN_end.png` czeka w artefakcie. Klucz = `okno:` z raportu verifiera. Bez nowego
 magazynu — licznik to pole `strata_okna: N` w `## Cel` kolejnych issues naprawczych tego
 okna. **2** straty z rzędu = koniec łatania: jednorazowy pomiar klawisza „wstecz"
@@ -283,5 +277,5 @@ Wygaśnięcie `CLAUDE_CODE_OAUTH_TOKEN` (rok od `claude setup-token`) i `ASSETS_
 - **Granica `.github/` stoi na drodze scalania, nie na pushu.** Agent z `Bash(git:*)` mógłby
   wypchnąć na gałąź domyślną wprost. Uszczelnienie wymaga reguły ochrony gałęzi (ustawienie
   właściciela) i świadomie nie jest tu zrobione.
-- **Cache emulatora ([#24](https://github.com/Kucze3205/ReinforcmentBlockBlast/issues/24)) nie jest podpięty.** Zimny start z pobraniem obrazu; do decyzji po biegu na sucho.
-- **`rola:bench` uruchamia polecenia z `## Weryfikacja`**, bez polityki rekordu i wag ([#21](https://github.com/Kucze3205/ReinforcmentBlockBlast/issues/21)).
+- **Cache emulatora nie jest podpięty.** Zimny start z pobraniem obrazu; do decyzji po biegu na sucho.
+- **`rola:bench` uruchamia polecenia z `## Weryfikacja`**, bez polityki rekordu i wag.
