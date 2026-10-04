@@ -2,7 +2,7 @@
 Most do oryginału (#18): zrzut ekranu -> stan -> ruch -> przeciągnięcie -> potwierdzenie.
 
 Działa na emulatorze w Actions (ekran 320x640). Stan planszy i trzech klocków
-czytany z pikseli, ruch wybiera polityka zachłanna z benchmarku, wykonanie przez
+czytany z pikseli, ruch wybiera polityka węzła (`policies.build`), wykonanie przez
 `adb shell input motionevent`. Każdy ruch trafia do bridge-out/moves.jsonl
 (stan, trójka, ruch, wynik — wejście z #9 dla dopasowania symulatora).
 
@@ -21,7 +21,7 @@ from PIL import Image, ImageDraw
 
 from board import Board
 from pieces import Piece
-from policies import GreedyPolicy
+import policies
 
 OUT = "bridge-out"
 PACKAGE = "com.block.juggle"
@@ -30,6 +30,9 @@ BOARD_X, BOARD_Y, CELL = 17, 136, 35.6
 TRAY_Y0, TRAY_Y1, TRAY_CELL = 440, 585, 16
 SCORE_BOX = (60, 70, 260, 130)
 FRAMES = 3
+KEEP = 10  # tyle ostatnich ruchów zachowuje zdjęcia i wpis w pomiar.json
+CEL = int(os.environ.get("CEL", 0))  # licznik apki kończący partię; 0 = bez celu
+LIMIT_S = float(os.environ.get("LIMIT_MINUT", 0)) * 60  # 0 = bez limitu
 DRAG_GAIN = 1.5  # zmierzone: klocek przesuwa się 1,5 px na 1 px palca
 LIFT = 80.6  # środek podniesionego klocka jest tyle px nad środkiem klocka na tacce
 
@@ -189,16 +192,34 @@ def annotate(img, grid, path):
     im.save(path)
 
 
-def main(max_moves):
-    os.makedirs(OUT, exist_ok=True)
-    policy = GreedyPolicy()
+def drop_old_images(n):
+    """Zdjęcia tylko z ostatnich KEEP ruchów: pełna partia to tysiące ruchów."""
+    for kind in ("state", "read", "aim"):
+        try:
+            os.remove(os.path.join(OUT, f"{n - KEEP:03d}_{kind}.png"))
+        except OSError:
+            pass
+
+
+def play(max_moves, st, t0):
+    policy = policies.build("weights" if os.path.isdir("weights") and os.listdir("weights") else None)
     log = open(os.path.join(OUT, "moves.jsonl"), "w")
     img, grid, slots = settled_state()
     ok_streak = best_streak = 0
     for n in range(max_moves):
         score = read_score(img)
+        if score is not None:
+            st["licznik"] = score
+        st["ruchy"] = n
+        if CEL and (st["licznik"] or 0) >= CEL:
+            st.update(koniec="cel", przyczyna=None)
+            break
+        if LIMIT_S and time.time() - t0 > LIMIT_S:
+            st.update(koniec="przerwanie", przyczyna="limit czasu partii")
+            break
         Image.fromarray(img.astype(np.uint8)).save(os.path.join(OUT, f"{n:03d}_state.png"))
         annotate(img, grid, os.path.join(OUT, f"{n:03d}_read.png"))
+        drop_old_images(n)
         board = Board()
         board.grid = [row[:] for row in grid]
         pieces = [Piece(s[0], f"slot{i}", -1) if s else None for i, s in enumerate(slots)]
@@ -208,10 +229,21 @@ def main(max_moves):
             entry["end"] = "gra nie jest na pierwszym planie"
             log.write(json.dumps(entry) + "\n")
             print(entry["end"], flush=True)
+            st.update(koniec="przerwanie", przyczyna=entry["end"])
             break
         if not moves:
+            # Brak ruchu wg odczytu to przegrana dopiero, gdy ten sam odczyt po chwili się utrzyma:
+            # animacja i błąd odczytu też dają pustą listę.
+            time.sleep(3)
+            img, grid, slots = stable_state()
+            again = [Piece(s[0], f"slot{i}", -1) if s else None for i, s in enumerate(slots)]
+            probe = Board()
+            probe.grid = [row[:] for row in grid]
+            if legal_moves(probe, again):
+                continue
             entry["end"] = "brak legalnego ruchu wg odczytu"
             log.write(json.dumps(entry) + "\n")
+            st.update(koniec="przegrana", przyczyna=None, plansza=grid)
             break
         game = SimpleNamespace(board=board, pieces=pieces, combo=0)
         i, x, y = policy.act(game, moves)
@@ -226,10 +258,34 @@ def main(max_moves):
         entry.update(move={"slot": i, "x": x, "y": y}, drag=info, expected=expected, observed=observed, ok=ok)
         log.write(json.dumps(entry) + "\n")
         log.flush()
+        st["ostatnie_ruchy"] = (st["ostatnie_ruchy"] + [{"n": n, "move": entry["move"], "score": score}])[-KEEP:]
         print(f"ruch {n}: slot {i} -> ({x},{y}) wynik {score} {'OK' if ok else 'ROZBIEŻNOŚĆ'}", flush=True)
+    log.close()
     annotate(img, grid, os.path.join(OUT, "final.png"))
     print(f"najdłuższa seria zgodnych ruchów: {best_streak}")
     return best_streak
+
+
+def main(max_moves):
+    """Gra do końca partii i zapisuje bridge-out/pomiar.json.
+
+    koniec: `cel` (licznik >= CEL), `przegrana` (brak ruchu, utrzymany po ponownym odczycie),
+    `przerwanie` (gra zniknęła, limit czasu, limit ruchów), `awaria` (wyjątek mostu lub adb).
+    """
+    os.makedirs(OUT, exist_ok=True)
+    t0 = float(os.environ.get("T_START") or time.time())
+    st = {"koniec": "przerwanie", "przyczyna": "limit ruchów", "licznik": None, "ruchy": 0,
+          "plansza": None, "ostatnie_ruchy": []}
+    streak = 0
+    try:
+        streak = play(max_moves, st, t0)
+    except Exception as exc:
+        st.update(koniec="awaria", przyczyna=f"{type(exc).__name__}: {str(exc)[:200]}")
+    st["czas_s"] = round(time.time() - t0, 1)
+    with open(os.path.join(OUT, "pomiar.json"), "w") as fh:
+        json.dump(st, fh)
+    print(f"koniec: {st['koniec']}, licznik: {st['licznik']}")
+    return streak
 
 
 if __name__ == "__main__":

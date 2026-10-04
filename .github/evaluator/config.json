@@ -1,0 +1,12 @@
+{
+  "rozdania": 300,
+  "cap": 2000,
+  "limit_shardu_s": 3300,
+  "partie": 10,
+  "cel": 1000000,
+  "tie": 1e-13,
+  "tylko_do_odczytu": {
+    "sym": ["board.py", "game.py", "generator.py", "pieces.py", "scoring.py"],
+    "most": ["bridge.py", "tools/bridge.sh"]
+  }
+}

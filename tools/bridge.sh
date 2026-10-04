@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Most (#18): instaluje grę, akceptuje ToS, oddaje sterowanie bridge.py.
 set -u
+export T_START=$(date +%s)   # czas partii liczy też start apki
 OUT=bridge-out
 PKG=com.block.juggle
 mkdir -p "$OUT"

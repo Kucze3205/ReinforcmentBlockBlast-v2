@@ -1,0 +1,136 @@
+# Ocena jednego węzła: symulator (shardy) -> próg (0 przegranych) -> seria na emulatorze -> zliczenie.
+# Start: `gh workflow run ocena.yml -f wezel=<sha> -f drzewo=<t> -f id=<nazwa> [-f partie='[3,7]']`
+# Wynik: artefakt `ocena-<id>` z ocena.json (format i zasady: .github/evaluator/ocena.py).
+# Powtórka przerwanych partii: ten sam węzeł z `partie` = brakujące numery, a wynik scala
+#   python3 .github/evaluator/ocena.py zlicz --drzewo <t> --poprzednia <stary ocena.json> ...
+name: ocena
+run-name: ocena ${{ inputs.id }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      wezel:
+        description: SHA węzła
+        required: true
+      drzewo:
+        description: Numer drzewa (z niego pochodzą rozdania)
+        required: true
+      id:
+        description: Identyfikator oceny (nazwa przebiegu i artefaktów)
+        required: true
+      partie:
+        description: Numery partii serii do zagrania (JSON); domyślnie wszystkie
+        default: "[1,2,3,4,5,6,7,8,9,10]"
+
+permissions:
+  contents: read
+
+jobs:
+  sym:
+    if: vars.AUTOPILOT == 'on'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60   # limit_shardu_s w config.json musi być krótszy
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.wezel }}
+          path: node
+          persist-credentials: false
+      - name: Zależności węzła
+        run: if [ -f node/requirements.txt ]; then pip install -r node/requirements.txt; fi
+      - name: Nałóż pliki ewaluatora na węzeł
+        run: python3 .github/evaluator/ocena.py nakladka node
+      - name: Ocena symulatorem
+        env:
+          DEALS_SALT: ${{ secrets.DEALS_SALT }}
+        run: |
+          mkdir sym-out
+          python3 .github/evaluator/ocena.py sym node --drzewo "${{ inputs.drzewo }}" --shard "${{ matrix.shard }}/10" --out "sym-out/sym-${{ matrix.shard }}.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sym-${{ inputs.id }}-${{ matrix.shard }}
+          path: sym-out/
+
+  prog:
+    needs: sym
+    if: ${{ !cancelled() && needs.sym.result != 'skipped' }}
+    runs-on: ubuntu-latest
+    outputs:
+      seria: ${{ steps.p.outputs.seria }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: sym-${{ inputs.id }}-*
+          path: sym
+      - id: p
+        run: |
+          python3 .github/evaluator/ocena.py zlicz --drzewo "${{ inputs.drzewo }}" --sym sym --out ocena.json
+          echo "seria=$(jq -r .potrzebna_seria ocena.json)" >> "$GITHUB_OUTPUT"
+
+  seria:
+    needs: prog
+    if: ${{ needs.prog.outputs.seria == 'true' }}
+    concurrency:
+      group: seria
+      cancel-in-progress: false
+    uses: ./.github/workflows/seria.yml
+    with:
+      seria: ${{ inputs.id }}
+      wezel: ${{ inputs.wezel }}
+      partie: ${{ inputs.partie }}
+    secrets: inherit
+
+  wynik:
+    needs: [prog, seria]
+    if: ${{ !cancelled() && needs.prog.result == 'success' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # tylko zapis rekordu węzła; ten job nie uruchamia kodu węzła
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: sym-${{ inputs.id }}-*
+          path: sym
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: seria-${{ inputs.id }}-partia-*
+          path: seria
+      - name: Zlicz ocenę
+        run: |
+          python3 .github/evaluator/ocena.py zlicz --drzewo "${{ inputs.drzewo }}" --wezel "${{ inputs.wezel }}" \
+            --sym sym --seria seria --out ocena.json --podsumowanie "$GITHUB_STEP_SUMMARY"
+          python3 .github/evaluator/ocena.py bramka ocena.json || true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ocena-${{ inputs.id }}
+          path: ocena.json
+      # id = <drzewo>-<węzeł>; rekord trees/<drzewo>/<węzeł>.json pisze job węzła, tu dostaje oceny i stan
+      - name: Zapisz ocenę w rekordzie węzła
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          DRZEWO: ${{ inputs.drzewo }}
+          ID: ${{ inputs.id }}
+        run: |
+          set -eu
+          WEZEL=${ID#"$DRZEWO"-}
+          python3 .github/evaluator/ocena.py zapisz ocena.json "trees/$DRZEWO/$WEZEL.json"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          PLIKI="trees/$DRZEWO/$WEZEL.json"
+          if [ -f trees/cel.json ]; then PLIKI="$PLIKI trees/cel.json"; fi
+          bash .github/loop/zapisz.sh "ocena $DRZEWO/$WEZEL" $PLIKI

@@ -1,27 +1,57 @@
-# Seria weryfikacyjna: 10 partii równolegle na oryginale, bez sesji agenta.
-# Start: `gh workflow run seria.yml -f polityka='<spec>' -f seria=<id> [-f limit_minut=300]`.
-# Wynik partii K: artefakt `seria-<id>-partia-K` (KATALOG z pomiar.json, docs/seria-skrypt.md):
+# Seria na emulatorze: partie równolegle na oryginale, bez sesji agenta. Każda partia gra do końca
+# (cel, przegrana, przerwanie, awaria) i zapisuje pomiar.json (bridge.py).
+# Wywoływana z ocena.yml; ręcznie (faza 0, diagnoza):
+#   gh workflow run seria.yml -f seria=<id> [-f wezel=<sha>] [-f partie='[3,7]']
+# Wynik partii K: artefakt `seria-<id>-partia-K` (katalog z pomiar.json):
 #   gh run download <run-id> -n seria-<id>-partia-K
+# Jedna seria naraz pilnuje wywołujący job w ocena.yml (concurrency: seria); ręcznych
+# uruchomień nie wolno nakładać na siebie.
 name: seria
 run-name: seria ${{ inputs.seria }}
 
 on:
   workflow_dispatch:
     inputs:
-      polityka:
-        description: Napis specyfikacji polityki (argv[2] mostu)
-        required: true
       seria:
         description: Identyfikator serii (nazwa przebiegu i artefaktów)
         required: true
+        type: string
+      wezel:
+        description: SHA węzła do zagrania; pusty = gałąź domyślna
+        required: false
+        default: ""
+        type: string
+      partie:
+        description: Numery partii do zagrania (JSON); domyślnie wszystkie
+        required: false
+        default: "[1,2,3,4,5,6,7,8,9,10]"
+        type: string
       limit_minut:
-        description: Limit czasu partii w minutach (zegar skryptu; job ma 355 min, start apki ~3 min)
+        description: Limit czasu partii w minutach (zegar mostu; job ma 355 min, start apki ~3 min)
+        required: false
         default: "300"
-
-# CONTEXT.md: w danej chwili trwa co najwyżej jedna seria
-concurrency:
-  group: seria
-  cancel-in-progress: false
+        type: string
+  workflow_call:
+    inputs:
+      seria:
+        description: Identyfikator serii (nazwa przebiegu i artefaktów)
+        required: true
+        type: string
+      wezel:
+        description: SHA węzła do zagrania; pusty = gałąź domyślna
+        required: false
+        default: ""
+        type: string
+      partie:
+        description: Numery partii do zagrania (JSON); domyślnie wszystkie
+        required: false
+        default: "[1,2,3,4,5,6,7,8,9,10]"
+        type: string
+      limit_minut:
+        description: Limit czasu partii w minutach (zegar mostu; job ma 355 min, start apki ~3 min)
+        required: false
+        default: "300"
+        type: string
 
 permissions:
   contents: read
@@ -33,13 +63,19 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        partia: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-    env:
-      KATALOG: seria-out
-      POLITYKA: ${{ inputs.polityka }}
-      LIMIT_MINUT: ${{ inputs.limit_minut }}
+        partia: ${{ fromJSON(inputs.partie) }}
     steps:
+      # Kod ewaluatora z gałęzi domyślnej; węzeł w node/ z nałożonymi plikami tylko do odczytu.
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.wezel || github.sha }}
+          path: node
+          persist-credentials: false
+      - name: Nałóż pliki ewaluatora na węzeł
+        run: python3 .github/evaluator/ocena.py nakladka node
 
       - name: Włącz KVM
         run: |
@@ -47,15 +83,22 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
-      - name: Zależności mostu
+      - name: Zależności mostu i węzła
         run: |
           sudo apt-get install -y -q tesseract-ocr
           pip install pillow numpy
+          if [ -f node/requirements.txt ]; then pip install -r node/requirements.txt; fi
 
       - name: Pobierz APK z prywatnego release
         env:
           GH_TOKEN: ${{ secrets.ASSETS_READ_TOKEN }}
-        run: gh release download v10.7.5 --repo Kucze3205/blockblast-assets --dir assets --pattern '*.apk'
+        run: gh release download v10.7.5 --repo Kucze3205/blockblast-assets --dir node/assets --pattern '*.apk'
+
+      - name: Parametry partii z konfiguracji ewaluatora
+        run: |
+          echo "CEL=$(python3 -c "import json;print(json.load(open('.github/evaluator/config.json'))['cel'])")" >> "$GITHUB_ENV"
+          echo "LIMIT_MINUT=${{ inputs.limit_minut }}" >> "$GITHUB_ENV"
+          echo "MOVES=100000000" >> "$GITHUB_ENV"
 
       - uses: reactivecircus/android-emulator-runner@v2
         with:
@@ -64,10 +107,11 @@ jobs:
           arch: x86_64
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -memory 4096
-          script: bash tools/seria.sh
+          working-directory: node
+          script: bash tools/bridge.sh
 
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: seria-${{ inputs.seria }}-partia-${{ matrix.partia }}
-          path: seria-out/
+          path: node/bridge-out/

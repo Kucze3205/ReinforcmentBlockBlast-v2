@@ -13,6 +13,7 @@ Sekcje o pozostałych workflowach powstaną razem z nimi.
 |---|---|
 | `CLAUDE_CODE_OAUTH_TOKEN` | Uwierzytelnia sesje Claude Code subskrypcją właściciela. Powstaje z `claude setup-token`, ważny rok. |
 | `ASSETS_READ_TOKEN` | Odczyt wydania z APK z prywatnego repo zasobów (`gh release download`). Wygasa ok. 2026-10-21. |
+| `DEALS_SALT` | Sól rozdań oceny symulatorem (`ocena.py`): rozdania drzewa to `random.Random("<sól>:<drzewo>")`. Widzi ją tylko krok `sym` w `ocena.yml`; proces zabiera ją ze środowiska, zanim zaimportuje kod węzła. Brak soli to błąd, nie wartość domyślna (repo jest publiczne). Ustawienie: `gh secret set DEALS_SALT --body "$(python -c 'import secrets;print(secrets.token_hex(16))')"`. Zmiana soli zmienia hash i unieważnia `s_sym` wszystkich węzłów. |
 
 Do samowyzwalania pętli **nie ma sekretu** — wystarcza wbudowany `GITHUB_TOKEN`
 w parze z `workflow_dispatch`. Żadnego PAT-a, żadnego klucza GitHub App.
@@ -25,6 +26,28 @@ Ta nazwa **nie może istnieć** ani jako sekret, ani jako zmienna, ani w `env:`
 żadnego joba. Ma udokumentowane pierwszeństwo nad tokenem subskrypcji i cicho
 przekieruje rachunek na płatne API. Cisza jest tu najgorsza — nic się nie zepsuje,
 tylko przyjdzie faktura.
+
+---
+
+## Ewaluator (`ocena.yml`, `seria.yml`, `.github/evaluator/`)
+
+Ocena węzła: `gh workflow run ocena.yml -f wezel=<sha> -f drzewo=<t> -f id=<nazwa>`.
+Przebieg: 10 shardów symulatora (300 rozdań, cap 2000) → przy 0 przegranych seria 10 partii na
+emulatorze (`seria.yml`, jedna naraz: `concurrency: seria`) → artefakt `ocena-<id>` z `ocena.json`.
+Pierwszy krok pętli, `AUTOPILOT`, sprawdza `ocena.yml`; `seria.yml` wywołana z niego już go nie sprawdza.
+
+| Co | Zasada |
+|---|---|
+| `s_sym` | przeżycie/cap średnio po rozdaniach, punkty tylko rozstrzygają remis (waga `tie` ≪ 1/cap), nie więcej niż 1 |
+| `s_v` | `1 + s_emu` przy pełnej serii, inaczej `s_sym`; liczy `ocena.s_v()`, nie jest zapisywane |
+| próg serii | 0 przegranych w symulatorze i ocena nie „za wolna" (shard przekroczył `limit_shardu_s`) |
+| partia serii | `pomiar.json` z mostu: `koniec` = `cel` \| `przegrana` \| `przerwanie` \| `awaria`; ważne tylko dwie pierwsze |
+| powtórka | brakujące numery partii (`partie`), wynik scala `ocena.py zlicz --poprzednia`; do pełnych 10 ważnych status to `w_toku` |
+| bramka celu | `ocena.py bramka ocena.json`: 10 ważnych partii, wszystkie `cel`; kod 0 = cel osiągnięty ; `ocena.yml` zakłada wtedy `trees/cel.json` — znacznik końca pętli, który ma sprawdzać harmonogram drzewa |
+| hash | `sym` (symulator, generator, punktacja, `ocena.py`, parametry, rozdania drzewa) i `most` (most, `seria.yml`, liczba partii i cel); naprawa mostu nie przelicza `s_sym` |
+| tylko do odczytu | pliki z `tylko_do_odczytu` w `config.json`: ewaluator nakłada je z gałęzi domyślnej na kopię węzła |
+| rekord węzła | `ocena.yml` dopisuje do `oceny` (`s_sym` per hash, `sym` z przeżyciem per rozdanie, `emu` z wynikami partii i unieważnionymi, `hash_most`; `s_emu` i `czas_serii_min` dopiero przy pełnej serii) i ustawia `stan`: `oceniony` albo `ocena w toku`; `oczekiwanie_min` zostaje po stronie wywołującego |
+| polityka węzła | `policies.build(weights)`; wagi z katalogu `weights/` węzła (`.gitignore` przepuszcza tam `*.pth`) |
 
 ---
 

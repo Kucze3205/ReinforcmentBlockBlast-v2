@@ -58,6 +58,15 @@ class ModelPolicy:
         return tuple(move)
 
 
+def build(weights=None):
+    """Polityka węzła, którą ocenia ewaluator (symulator i most).
+
+    `weights` to katalog `weights/` węzła albo None. Domyślnie zachłanna; węzeł podmienia
+    to, co zwraca, i zachowuje sygnaturę.
+    """
+    return GreedyPolicy()
+
+
 def _immediate_gain(game, action):
     """Punkty, które da to postawienie — wg skalibrowanego wzoru, bez zmiany stanu gry."""
     idx, x, y = action
