@@ -19,10 +19,7 @@ GH_TOKEN="$LOOP_GH_TOKEN" python3 "$LOOP" export "$ISSUE" .session/issue.md
   done ) >/dev/null 2>&1 &
 SYNC=$!
 
-# GH_TOKEN dostaje wyłącznie orchestrator (jedyna rola z `gh` w profilu)
-[ "$ROLE" = orchestrator ] && export GH_TOKEN="$LOOP_GH_TOKEN"
-
-PROMPT="Jesteś rolą \`$ROLE\` w pętli. Wywołaj skill \`$ROLE\` narzędziem Skill i wykonaj zadanie z issue #$ISSUE. Wejście: .session/issue.md. Raport zapisz w .session/report.md (format i statusy: .claude/skills/PROTOKOL-SESJI.md). Pracujesz na gałęzi task/$ISSUE; commituj często."
+PROMPT="Jesteś rolą \`$ROLE\` w pętli. Wywołaj skill \`$ROLE\` narzędziem Skill i wykonaj zadanie z issue #$ISSUE. Wejście: .session/issue.md. Raport zapisz w .session/report.md. Pracujesz na gałęzi task/$ISSUE; commituj często."
 # koniec tury w -p to koniec sesji: praca w tle i Monitor giną z runnerem: zdarzyło się, że sesja skończyła turę na „wrócę, gdy policzy"
 export CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1
 # długie liczenie na pierwszym planie: domyślnie Bash ucina po 2 min (maks. 10), pokolenie CEM trwa ~11 min
