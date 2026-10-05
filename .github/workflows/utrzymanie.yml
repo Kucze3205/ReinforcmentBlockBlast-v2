@@ -127,7 +127,7 @@ jobs:
           sudo udevadm trigger --name-match=kvm
       - name: Zależności i Claude Code
         run: |
-          sudo apt-get install -y -q tesseract-ocr
+          sudo apt-get install -y -q tesseract-ocr bubblewrap   # bubblewrap: CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=1 bez niego kończy sesję od razu
           pip install -q numpy pillow
           pip install -q torch --index-url https://download.pytorch.org/whl/cpu   # testy silnika importują agenta
           npm install -g @anthropic-ai/claude-code@2.1.289
