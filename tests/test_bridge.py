@@ -23,13 +23,14 @@ class MostTest(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.saved = {k: getattr(bridge, k) for k in (
             "OUT", "CEL", "LIMIT_S", "settled_state", "stable_state", "read_score", "in_game",
-            "drag", "annotate")}
+            "drag", "annotate", "screenshot")}
         self.saved_sleep, bridge.time.sleep = bridge.time.sleep, lambda s: None
         self.game = Game(seed=7)
         bridge.OUT = self.tmp.name
         bridge.CEL = bridge.LIMIT_S = 0
         bridge.settled_state = bridge.stable_state = self.screen
         bridge.read_score = lambda img: self.game.score
+        bridge.screenshot = lambda: self.img
         bridge.in_game = lambda: True
         bridge.annotate = lambda *a: None
         bridge.drag = self.drag
@@ -92,6 +93,30 @@ class MostTest(unittest.TestCase):
         bridge.main(100000)
         self.assertEqual(self.pomiar()["koniec"], "przegrana")
         self.assertGreater(self.pomiar()["ruchy"], 0)
+
+    def test_licznik_odrzuca_odczyt_z_zgubiona_cyfra(self):
+        # 7459 -> 745 (animacja): odczyt spoza okna [last, last + MAX_GAIN] nie przechodzi
+        odczyty = iter([745, 7459, 7459])
+        bridge.read_score = lambda img: next(odczyty)
+        self.assertEqual(bridge.confirmed_score(self.img, 7455), 7459)
+
+    def test_licznik_wymaga_dwoch_zgodnych_odczytow(self):
+        odczyty = iter([950, 520, 495, 495])
+        bridge.read_score = lambda img: next(odczyty)
+        self.assertEqual(bridge.confirmed_score(self.img, 457), 495)
+
+    def test_licznik_bez_zgody_to_none(self):
+        odczyty = iter([None, 7, 7000000, 12, None])
+        bridge.read_score = lambda img: next(odczyty)
+        self.assertIsNone(bridge.confirmed_score(self.img, 100))
+
+    def test_koncowy_wpis_nie_zapisuje_smieciowej_tacki(self):
+        smiec = [([[1] * 7] * 9, (0, 0))] * 3
+        bridge.in_game = lambda: False
+        bridge.settled_state = bridge.stable_state = lambda: (self.img, [[0] * 8 for _ in range(8)], smiec)
+        bridge.main(10)
+        wpis = json.loads((Path(self.tmp.name) / "moves.jsonl").read_text().splitlines()[-1])
+        self.assertIsNone(wpis["tray"])
 
 
 if __name__ == "__main__":

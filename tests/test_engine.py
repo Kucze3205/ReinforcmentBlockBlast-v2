@@ -14,7 +14,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from game import Game
 from generator import Generator
 from pieces import CANONICAL_TYPES, EXPECTED_POSES, PIECE_POOL, PIECE_TYPES
-from scoring import FULL_CLEAR_BONUS, clear_points, line_bonus, placement_points
+from scoring import FULL_CLEAR_BONUS, clear_points, combo_multiplier, line_bonus, placement_points
 
 ONE_BY_ONE = PIECE_POOL[0]
 
@@ -64,6 +64,13 @@ class TestScoringFormula(unittest.TestCase):
         self.assertEqual(clear_points(1, 2), 20)
         self.assertEqual(clear_points(3, 2), 60)
         self.assertEqual(clear_points(0, 2), 0)
+
+    def test_combo_multiplier_matches_bridge_logs(self):
+        # Z logów mostu: powyżej combo 4 apka płaci więcej niż liniowo.
+        self.assertEqual([combo_multiplier(c) for c in range(1, 7)], [1, 2, 3, 4, 9, 12])
+        self.assertEqual(clear_points(6, 1), 120)
+        self.assertEqual(clear_points(22, 1), 10 * 50)
+        self.assertEqual(clear_points(21, 2), 20 * 48)
 
 
 class TestComboMechanics(unittest.TestCase):
@@ -180,16 +187,17 @@ class TestPiecePool(unittest.TestCase):
         }
         self.assertEqual(actual, expected)
 
-    def test_sampling_is_uniform_over_types_not_poses(self):
-        # R-8: typ 3x3 (1 orientacja) musi wypadać ~8x częściej niż konkretna poza L.
+    def test_sampling_follows_bridge_log_frequencies(self):
+        # Rozkład z logów mostu: 2x2 wypada ~13x częściej niż L-0, a beam4-1 ponad 2x częściej niż beam4-0
+        # (stary model "równo na typ" dawał χ² p=0 na tackach z apki).
         gen = Generator(1234)
         counts = {}
-        for _ in range(20000):
+        for _ in range(40000):
             piece = gen._next_piece()
             counts[piece.name] = counts.get(piece.name, 0) + 1
-        square3 = counts.get("square3", 0)
-        l_pose = counts.get("L-0", 0)
-        self.assertGreater(square3 / max(l_pose, 1), 5.0)
+        self.assertGreater(counts["square2"] / max(counts["L-0"], 1), 6.0)
+        self.assertGreater(counts["beam4-1"] / max(counts["beam4-0"], 1), 1.5)
+        self.assertTrue(all(counts.get(p.name) for p in PIECE_POOL), "każda poza musi mieć szansę")
 
 
 class TestBenchmarkPrerequisites(unittest.TestCase):

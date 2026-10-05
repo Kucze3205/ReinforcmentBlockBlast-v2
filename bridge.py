@@ -20,7 +20,7 @@ import numpy as np
 from PIL import Image, ImageDraw
 
 from board import Board
-from pieces import Piece
+from pieces import PIECE_POOL, Piece
 import policies
 
 OUT = "bridge-out"
@@ -34,6 +34,7 @@ KEEP = 10  # tyle ostatnich ruchów zachowuje zdjęcia i wpis w pomiar.json
 CEL = int(os.environ.get("CEL", 0))  # licznik apki kończący partię; 0 = bez celu
 LIMIT_S = float(os.environ.get("LIMIT_MINUT", 0)) * 60  # 0 = bez limitu
 DRAG_GAIN = 1.5  # zmierzone: klocek przesuwa się 1,5 px na 1 px palca
+MAX_GAIN = 3000  # największy przyrost licznika za jeden ruch (zmierzone: 964 przy combo 21)
 LIFT = 80.6  # środek podniesionego klocka jest tyle px nad środkiem klocka na tacce
 
 
@@ -140,8 +141,36 @@ def read_score(img):
         return None
 
 
+def confirmed_score(img, last, tries=5):
+    """Licznik potwierdzony dwoma zgodnymi odczytami z różnych klatek, albo None.
+
+    OCR gubi cyfry przy animacji licznika (7459 -> 745, 4744 -> 474) i dokłada fałszywe skoki;
+    jeden zły odczyt zawyżał tempo apki w logach 7-krotnie. Licznik nie maleje i w jednym ruchu
+    rośnie najwyżej o MAX_GAIN, więc odczyty spoza tego okna odpadają.
+    """
+    seen = []
+    for k in range(tries):
+        score = read_score(img)
+        if score is not None and (last is None or last <= score <= last + MAX_GAIN):
+            if score in seen:
+                return score
+            seen.append(score)
+        if k + 1 < tries:
+            time.sleep(0.4)
+            img = screenshot()
+    return None
+
+
 def cell_center(c, r):
     return BOARD_X + (c + .5) * CELL, BOARD_Y + (r + .5) * CELL
+
+
+def known_tray(slots):
+    """Tacka do logu: None, gdy któryś slot nie jest klockiem z puli (ekran końca gry, animacja, inna aplikacja)."""
+    known = {tuple(map(tuple, p.shape)) for p in PIECE_POOL}
+    if all(s is None or tuple(map(tuple, s[0])) in known for s in slots):
+        return [s[0] if s else None for s in slots]
+    return None
 
 
 def legal_moves(board, pieces):
@@ -207,7 +236,7 @@ def play(max_moves, st, t0):
     img, grid, slots = settled_state()
     ok_streak = best_streak = 0
     for n in range(max_moves):
-        score = read_score(img)
+        score = confirmed_score(img, st["licznik"])
         if score is not None:
             st["licznik"] = score
         st["ruchy"] = n
@@ -224,7 +253,7 @@ def play(max_moves, st, t0):
         board.grid = [row[:] for row in grid]
         pieces = [Piece(s[0], f"slot{i}", -1) if s else None for i, s in enumerate(slots)]
         moves = legal_moves(board, pieces)
-        entry = {"n": n, "board": grid, "tray": [s[0] if s else None for s in slots], "score": score}
+        entry = {"n": n, "board": grid, "tray": known_tray(slots), "score": score}
         if not in_game():
             entry["end"] = "gra nie jest na pierwszym planie"
             log.write(json.dumps(entry) + "\n")
@@ -248,6 +277,7 @@ def play(max_moves, st, t0):
         game = SimpleNamespace(board=board, pieces=pieces, combo=0)
         i, x, y = policy.act(game, moves)
         expected = simulate(board, pieces[i], x, y)
+        tray_before = slots
         info, aim = drag(slots[i][1], pieces[i], x, y)
         Image.fromarray(aim.astype(np.uint8)).save(os.path.join(OUT, f"{n:03d}_aim.png"))
         img, observed, slots = stable_state()
@@ -255,7 +285,7 @@ def play(max_moves, st, t0):
         grid = observed
         ok_streak = ok_streak + 1 if ok else 0
         best_streak = max(best_streak, ok_streak)
-        entry.update(move={"slot": i, "x": x, "y": y}, drag=info, expected=expected, observed=observed, ok=ok)
+        entry.update(tray=[s[0] if s else None for s in tray_before], move={"slot": i, "x": x, "y": y}, drag=info, expected=expected, observed=observed, ok=ok)
         log.write(json.dumps(entry) + "\n")
         log.flush()
         st["ostatnie_ruchy"] = (st["ostatnie_ruchy"] + [{"n": n, "move": entry["move"], "score": score}])[-KEEP:]
