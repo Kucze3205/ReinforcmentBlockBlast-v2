@@ -47,7 +47,7 @@ jobs:
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
         run: |
           set -eu
-          sudo apt-get install -y -q bubblewrap socat   # sandbox Claude Code (CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=1) bez nich kończy sesję od razu
+          bash .github/loop/sandbox.sh
           npm install -g @anthropic-ai/claude-code@2.1.289
           cp .github/loop/stream_filter.py "$RUNNER_TEMP/"
           bash .github/loop/offline.sh "${{ inputs.drzewo }}"
