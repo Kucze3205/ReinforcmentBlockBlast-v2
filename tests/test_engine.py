@@ -65,6 +65,19 @@ class TestScoringFormula(unittest.TestCase):
         self.assertEqual(clear_points(3, 2), 60)
         self.assertEqual(clear_points(0, 2), 0)
 
+    def test_combo_multiplier_tiers_match_app_logs(self):
+        # logi faza0: bonus za 1 linię 10,20,..,50 | 90,105,120,135,150 | 220,240,..,300
+        self.assertEqual([clear_points(c, 1) for c in range(1, 6)], [10, 20, 30, 40, 50])
+        self.assertEqual([clear_points(c, 1) for c in range(6, 11)], [90, 105, 120, 135, 150])
+        self.assertEqual([clear_points(c, 1) for c in range(11, 16)], [220, 240, 260, 280, 300])
+
+    def test_milestones_pay_once_on_crossing(self):
+        from scoring import milestone_points
+        self.assertEqual(milestone_points(456, 500), 400)
+        self.assertEqual(milestone_points(500, 600), 0)
+        self.assertEqual(milestone_points(400, 1200), 800)   # progi 500 i 1000
+        self.assertEqual(milestone_points(2481, 2532), 400)  # logi faza0: 2481->2932
+
 
 class TestComboMechanics(unittest.TestCase):
     def setUp(self):
@@ -83,7 +96,7 @@ class TestComboMechanics(unittest.TestCase):
         self.assertEqual(gained, 1 + 2 * 10)
 
     def test_combo_survives_two_placements_then_dies(self):
-        # R-4: combo wygasa przez licznik, nie natychmiast.
+        # R-4: combo wygasa przez licznik, nie natychmiast; logi faza0: 2 postawienia bez czyszczenia przeżywa, 3. zabija.
         row_full_except(self.game, 7, filler=True)
         place_1x1(self.game, 7, 0)
         self.assertEqual(self.game.combo, 1)
@@ -99,7 +112,7 @@ class TestComboMechanics(unittest.TestCase):
         # R-5: 300, nie 100.
         row_full_except(self.game, 7)
         gained = place_1x1(self.game, 7, 0)
-        # 1 komórka + combo 1 x B(1) + pusta plansza
+        # 1 komórka + combo 1 x B(1) + pusta plansza (w apce 0: logi faza0)
         self.assertEqual(gained, 1 + 10 + FULL_CLEAR_BONUS)
 
 

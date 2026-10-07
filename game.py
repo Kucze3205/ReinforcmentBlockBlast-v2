@@ -11,6 +11,7 @@ from scoring import (
     COMBO_COUNTER_BASE,
     FULL_CLEAR_BONUS,
     clear_points,
+    milestone_points,
     placement_points,
 )
 
@@ -93,6 +94,7 @@ class Game:
             self.pieces = self.generator.next_pieces()
             self.round_placement = 0
 
+        gained += milestone_points(self.score, self.score + gained)
         self.score += gained
         return gained
 

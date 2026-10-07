@@ -20,7 +20,7 @@ import numpy as np
 from PIL import Image, ImageDraw
 
 from board import Board
-from pieces import Piece
+from pieces import PIECE_POOL, Piece
 import policies
 
 OUT = "bridge-out"
@@ -73,16 +73,51 @@ def settled_state():
     return frames[-1], grid, tray
 
 
+POSE_SHAPES = {tuple(map(tuple, p.shape)) for p in PIECE_POOL}
+
+
+def tray_ok(tray):
+    """Tacka czytelna: każdy zajęty slot to klocek z puli. Reklama, okno nagrody albo animacja dają
+    kształty spoza puli (w logach faza0: siatki 9x7, 7x5) — to nie tacka, więc nie wolno jej zapisać ani zagrać."""
+    return all(s is None or tuple(map(tuple, s[0])) in POSE_SHAPES for s in tray)
+
+
 def stable_state(tries=6):
-    """Czeka, aż dwa kolejne odczyty będą identyczne: czyszczenie linii i licznik wyniku są animowane."""
+    """Czeka, aż dwa kolejne odczyty będą identyczne i czytelne: czyszczenie linii i licznik wyniku są animowane."""
     prev = None
     for _ in range(tries):
         img, grid, tray = settled_state()
         key = json.dumps([grid, [s[0] if s else None for s in tray]])
-        if key == prev:
+        if key == prev and tray_ok(tray):
             break
         prev = key
     return img, grid, tray
+
+
+def refocus():
+    """Gra straciła pierwszy plan (reklama, okno nagrody, aktualizacja Play): zamyka nakładkę i wraca do gry."""
+    for key in ("KEYCODE_BACK", None):
+        try:
+            if key:
+                adb("shell", "input", "keyevent", key)
+            else:
+                adb("shell", "monkey", "-p", PACKAGE, "-c", "android.intent.category.LAUNCHER", "1")
+            time.sleep(3)
+            if in_game():
+                return True
+        except Exception:
+            pass
+    return False
+
+
+def wait_readable(img, grid, slots, tries=5):
+    """Tacka spoza puli to nie plansza gry (okno nad grą): czeka i czyta ponownie, zamiast zapisać śmieć."""
+    for _ in range(tries):
+        if tray_ok(slots):
+            break
+        time.sleep(2)
+        img, grid, slots = stable_state()
+    return img, grid, slots
 
 
 def is_block(img):
@@ -227,7 +262,7 @@ def drop_old_images(n):
 def play(max_moves, st, t0):
     policy = policies.build("weights" if os.path.isdir("weights") and os.listdir("weights") else None)
     log = open(os.path.join(OUT, "moves.jsonl"), "w")
-    img, grid, slots = settled_state()
+    img, grid, slots = wait_readable(*settled_state())
     ok_streak = best_streak = last_n = 0
     for n in range(max_moves):
         score = read_counter(img, st["licznik"], max(1, n - last_n))
@@ -241,6 +276,14 @@ def play(max_moves, st, t0):
         if LIMIT_S and time.time() - t0 > LIMIT_S:
             st.update(koniec="przerwanie", przyczyna="limit czasu partii")
             break
+        if not tray_ok(slots):
+            img, grid, slots = wait_readable(img, grid, slots)
+            if not tray_ok(slots):
+                if in_game() or refocus():
+                    img, grid, slots = stable_state()
+                    continue
+                st.update(koniec="przerwanie", przyczyna="tacka nieczytelna: okno nad grą")
+                break
         Image.fromarray(img.astype(np.uint8)).save(os.path.join(OUT, f"{n:03d}_state.png"))
         annotate(img, grid, os.path.join(OUT, f"{n:03d}_read.png"))
         drop_old_images(n)
@@ -249,7 +292,7 @@ def play(max_moves, st, t0):
         pieces = [Piece(s[0], f"slot{i}", -1) if s else None for i, s in enumerate(slots)]
         moves = legal_moves(board, pieces)
         entry = {"n": n, "board": grid, "tray": [s[0] if s else None for s in slots], "score": score}
-        if not in_game():
+        if not in_game() and not refocus():
             entry["end"] = "gra nie jest na pierwszym planie"
             log.write(json.dumps(entry) + "\n")
             print(entry["end"], flush=True)

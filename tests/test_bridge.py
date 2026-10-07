@@ -86,6 +86,22 @@ class MostTest(unittest.TestCase):
         self.assertEqual(p["koniec"], "awaria")
         self.assertIn("adb padł", p["przyczyna"])
 
+    def test_tacka_spoza_puli_nie_jest_czytelna(self):
+        smiec = [([[1] * 7 for _ in range(9)], (40, 500)), None, None]
+        self.assertFalse(bridge.tray_ok(smiec))
+        self.assertTrue(bridge.tray_ok(self.screen()[2]))
+
+    def test_smieciowa_tacka_nie_trafia_do_logu(self):
+        smiec = [([[1] * 7 for _ in range(9)], (40, 500)), None, None]
+        odczyty = iter([(self.img, [[0] * 8 for _ in range(8)], smiec)] * 3)
+        prawdziwy = self.screen
+        bridge.settled_state = lambda: next(odczyty, None) or prawdziwy()
+        bridge.stable_state = lambda: next(odczyty, None) or prawdziwy()
+        bridge.main(100000)
+        wpisy = [json.loads(l) for l in (Path(self.tmp.name) / "moves.jsonl").read_text().splitlines()]
+        for w in wpisy:
+            self.assertTrue(all(s is None or len(s) <= 5 for s in w["tray"]))
+
     def test_gra_poza_pierwszym_planem_to_przerwanie(self):
         bridge.in_game = lambda: False
         bridge.main(100000)

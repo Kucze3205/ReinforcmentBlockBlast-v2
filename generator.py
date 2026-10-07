@@ -1,16 +1,25 @@
 """
 Deterministic Piece Generator
 
-Losuje jak referencja z badania #2 (bbengine/src/env.h): najpierw 1/15 na typ
-kanoniczny, POTEM 1/n na orientację w obrębie typu (R-8). Trzy klocki losowane
-niezależnie — bez świadomości planszy i bez gwarancji grywalności tacki.
-
-Rozkład doboru w oryginale jest publicznie niezmierzony; to założenie modelowe
-autora referencji, nie pomiar — patrz docs/calibration-assumptions.md (Z-6).
+Rozkład poz zmierzony na logach mostu faza0 (462 klocków z tacek, 10 partii):
+oryginał nie losuje równo po typach (jak zakładała referencja #2, R-8), tylko
+bardzo nierówno po pozach — belki i kwadraty wypadają kilkukrotnie częściej niż
+S, T czy diag3. Wagi = liczność poz w logach + 1 (wygładzenie). Trzy klocki losowane
+niezależnie, bez świadomości planszy.
 """
 import random
 
-from pieces import PIECE_POOL, PIECE_TYPES
+from pieces import PIECE_POOL
+
+# Liczności poz (kolejność PIECE_POOL) z tacek w logach faza0.
+POSE_COUNTS = [
+    12, 29, 24, 28, 13, 7, 32, 28, 11, 37,
+    28, 19, 14, 12, 9, 4, 3, 2, 10, 7,
+    10, 2, 4, 9, 13, 3, 7, 3, 10, 4,
+    14, 3, 2, 11, 3, 4, 7, 1, 2, 4,
+    17,
+]
+POSE_WEIGHTS = [c + 1 for c in POSE_COUNTS]
 
 
 class Generator:
@@ -24,8 +33,7 @@ class Generator:
         self.rng = random.Random(seed)
 
     def _next_piece(self):
-        pose_indices = self.rng.choice(PIECE_TYPES)
-        return PIECE_POOL[self.rng.choice(pose_indices)]
+        return self.rng.choices(PIECE_POOL, weights=POSE_WEIGHTS)[0]
 
     def next_pieces(self):
         return [self._next_piece() for _ in range(3)]
