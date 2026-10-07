@@ -140,6 +140,29 @@ def read_score(img):
         return None
 
 
+MAX_SKOK = 3000  # największy wiarygodny przyrost licznika za jeden ruch (pomiar: ok. 2000)
+
+
+def read_counter(img, last, gap=1):
+    """Licznik wyniku odporny na OCR w trakcie animacji: dwa równe odczyty z kolejnych zrzutów,
+    wartość niemalejąca i bez nierealnego skoku względem ostatniej przyjętej (`gap` ruchów temu).
+    Zły odczyt (zgubiona/doklejona cyfra) zwraca None zamiast fałszywego przyrostu."""
+    prev = read_score(img)
+    for _ in range(4):
+        time.sleep(0.4)
+        cur = read_score(screenshot())
+        if cur is not None and cur == prev:
+            break
+        prev = cur
+    else:
+        return None
+    if prev is None:
+        return None
+    if last is not None and not last <= prev <= last + MAX_SKOK * gap:
+        return None
+    return prev
+
+
 def cell_center(c, r):
     return BOARD_X + (c + .5) * CELL, BOARD_Y + (r + .5) * CELL
 
@@ -205,11 +228,12 @@ def play(max_moves, st, t0):
     policy = policies.build("weights" if os.path.isdir("weights") and os.listdir("weights") else None)
     log = open(os.path.join(OUT, "moves.jsonl"), "w")
     img, grid, slots = settled_state()
-    ok_streak = best_streak = 0
+    ok_streak = best_streak = last_n = 0
     for n in range(max_moves):
-        score = read_score(img)
+        score = read_counter(img, st["licznik"], max(1, n - last_n))
         if score is not None:
             st["licznik"] = score
+            last_n = n
         st["ruchy"] = n
         if CEL and (st["licznik"] or 0) >= CEL:
             st.update(koniec="cel", przyczyna=None)

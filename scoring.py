@@ -9,7 +9,13 @@ niezależnych reimplementacjach:
     + FULL_CLEAR_BONUS za opróżnienie planszy
 
 Combo jest MNOŻNIKIEM całego bonusu za czyszczenie, nie dodatkiem (R-2).
-Nic z tego nie jest pomiarem na oryginale — patrz docs/calibration-assumptions.md.
+
+Pomiar na oryginale (logi mostu, .zadanie/dane): do combo 5 wzór się zgadza co do cyfry,
+od combo 6 apka płaci więcej: pojedyncza linia dawała bonus 90 przy combo 6, 260 przy 12,
+300 przy 14, 380 przy 17, 500 przy 22, 600 przy 26, 700 przy 30, 880 przy 38
+(czyli ok. 2,3 x 10 * combo w długiej serii). Dwie linie przy combo 16/20/24 dają
+730/971/1129 = 20 * 36,5/48,5/56,5, czyli ten sam mnożnik. Mechanizm nie jest znany;
+MULT_POINTS to interpolacja zmierzonych punktów (combo -> efektywny mnożnik).
 """
 
 FULL_CLEAR_BONUS = 300
@@ -32,6 +38,20 @@ def line_bonus(lines):
     return 10 * lines * (lines - 1)
 
 
+# (combo, efektywny mnożnik bonusu) zmierzone na oryginale; między punktami interpolacja liniowa.
+MULT_POINTS = [(0, 0), (5, 5), (6, 9), (12, 26), (14, 30), (17, 38), (22, 46), (26, 60), (30, 70), (38, 88)]
+MULT_SLOPE = 2.4  # nachylenie powyżej ostatniego punktu
+
+
+def combo_multiplier(combo):
+    if combo <= MULT_POINTS[-1][0]:
+        for (c0, m0), (c1, m1) in zip(MULT_POINTS, MULT_POINTS[1:]):
+            if combo <= c1:
+                return m0 + (m1 - m0) * (combo - c0) / (c1 - c0)
+    c, m = MULT_POINTS[-1]
+    return m + MULT_SLOPE * (combo - c)
+
+
 def clear_points(combo, lines):
-    """Punkty za czyszczenie: combo (po inkrementacji) mnoży bonus bazowy."""
-    return combo * line_bonus(lines)
+    """Punkty za czyszczenie: efektywny mnożnik combo (po inkrementacji) razy bonus bazowy."""
+    return round(combo_multiplier(combo) * line_bonus(lines))
