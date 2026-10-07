@@ -17,7 +17,7 @@ import time
 from types import SimpleNamespace
 
 import numpy as np
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageOps
 
 from board import Board
 from pieces import PIECE_POOL, Piece
@@ -140,8 +140,14 @@ def read_score(img):
     x0, y0, x1, y1 = SCORE_BOX
     crop = img[y0:y1, x0:x1]
     bw = np.where(crop.min(axis=2) > 170, 0, 255).astype(np.uint8)
+    ys, xs = np.nonzero(bw == 0)
+    if not len(ys):
+        return None
+    # Przycięcie do tekstu: z szerokimi pustymi marginesami tesseract czytał "5" jako "9" lub "59" (w logach faza0
+    # +400 i +3000...+5000 do przyrostu licznika, 13% zrzutów), po przycięciu wszystkie skale dają ten sam odczyt.
+    bw = bw[ys.min():ys.max() + 1, xs.min():xs.max() + 1]
     path = os.path.join(OUT, "_score.png")
-    Image.fromarray(bw).resize(((x1 - x0) * 3, (y1 - y0) * 3)).save(path)
+    ImageOps.expand(Image.fromarray(bw).resize((bw.shape[1] * 3, bw.shape[0] * 3)), border=20, fill=255).save(path)
     try:
         run = subprocess.run(["tesseract", path, "stdout", "--psm", "7", "-c",
                               "tessedit_char_whitelist=0123456789"], capture_output=True, text=True)

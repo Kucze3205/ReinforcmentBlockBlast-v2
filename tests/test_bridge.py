@@ -1,6 +1,7 @@
 """Most bez emulatora: ekran podstawiony przez symulator, sprawdzamy koniec partii i pomiar.json."""
 import json
 import os
+import shutil
 import sys
 import tempfile
 import unittest
@@ -60,6 +61,15 @@ class MostTest(unittest.TestCase):
         self.assertIsNone(bridge.read_counter(self.img, 500))   # skok 10003 > MAX_SKOK (jak w logach faza0)
         self.assertIsNone(bridge.read_counter(self.img, 500))   # licznik nie maleje
         self.assertEqual(bridge.read_counter(self.img, 500), 560)
+
+    @unittest.skipUnless(shutil.which("tesseract"), "brak tesseract")
+    def test_odczyt_licznika_z_piatka_na_poczatku(self):
+        # Zrzut z faza0 (partia 9, ruch 207): pełne pole czytane jako 59845, po przycięciu do tekstu 5845.
+        from PIL import Image
+        img = np.zeros((640, 320, 3), dtype=int)
+        img[70:130, 60:260] = np.asarray(Image.open(ROOT / "tests" / "fixtures" / "licznik_5845.png").convert("RGB"))
+        self.assertEqual(self.saved["read_score"](img), 5845)
+        self.assertIsNone(self.saved["read_score"](np.zeros((640, 320, 3), dtype=int)))
 
     def test_gra_do_przegranej(self):
         bridge.main(100000)

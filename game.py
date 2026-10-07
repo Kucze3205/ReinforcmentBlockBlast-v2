@@ -75,7 +75,7 @@ class Game:
         remaining = sum(1 for p in self.pieces if p is not None)
 
         if lines > 0:
-            self.combo += 1
+            self.combo += lines   # zmierzone: combo rośnie o liczbę linii, nie o 1
             self.combo_counter = COMBO_COUNTER_BASE + remaining
             gained += clear_points(self.combo, lines)
         elif self.combo_counter <= 1:
