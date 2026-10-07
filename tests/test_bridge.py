@@ -23,13 +23,14 @@ class MostTest(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.saved = {k: getattr(bridge, k) for k in (
             "OUT", "CEL", "LIMIT_S", "settled_state", "stable_state", "read_score", "in_game",
-            "drag", "annotate")}
+            "drag", "annotate", "screenshot")}
         self.saved_sleep, bridge.time.sleep = bridge.time.sleep, lambda s: None
         self.game = Game(seed=7)
         bridge.OUT = self.tmp.name
         bridge.CEL = bridge.LIMIT_S = 0
         bridge.settled_state = bridge.stable_state = self.screen
         bridge.read_score = lambda img: self.game.score
+        bridge.screenshot = lambda: self.img
         bridge.in_game = lambda: True
         bridge.annotate = lambda *a: None
         bridge.drag = self.drag
@@ -51,6 +52,14 @@ class MostTest(unittest.TestCase):
 
     def pomiar(self):
         return json.loads((Path(self.tmp.name) / "pomiar.json").read_text())
+
+    def test_licznik_odrzuca_zle_odczyty(self):
+        odczyty = iter([500, 500, 10503, 10503, 40, 40, 560, 560])
+        bridge.read_score = lambda img: next(odczyty)
+        self.assertEqual(bridge.read_counter(self.img, 497), 500)
+        self.assertIsNone(bridge.read_counter(self.img, 500))   # skok 10003 > MAX_SKOK (jak w logach faza0)
+        self.assertIsNone(bridge.read_counter(self.img, 500))   # licznik nie maleje
+        self.assertEqual(bridge.read_counter(self.img, 500), 560)
 
     def test_gra_do_przegranej(self):
         bridge.main(100000)
