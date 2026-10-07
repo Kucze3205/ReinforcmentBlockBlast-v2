@@ -240,7 +240,9 @@ jobs:
               cat "$WYNIK/iteracje.md" 2>/dev/null || echo "(brak)"
             } > "$RUNNER_TEMP/zgloszenie.md"
             fi
-            gh issue create --title "$TYTUL" --body-file "$RUNNER_TEMP/zgloszenie.md"
+            # issue od GITHUB_TOKEN nie uruchamia workflowów, więc samonaprawę wyzwalamy wprost
+            NR=$(gh issue create --title "$TYTUL" --body-file "$RUNNER_TEMP/zgloszenie.md" | grep -o '[0-9]*$')
+            gh workflow run naprawa-awarii.yml --ref "$DEFAULT_BRANCH" -f issue="$NR"
           fi
       # awaria samego przyjęcia (np. patch nie nakłada się na przesuniętą gałąź) nie może zostawić znacznika `naprawa`
       - name: Znacznik po awarii przyjęcia
@@ -256,8 +258,10 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           printf '{"stan":"wstrzymane","powod":"%s","id":"%s","przebieg":"%s"}\n' "$POWOD" "$ID" "$RUN_URL" > trees/utrzymanie.json
           bash .github/loop/zapisz.sh "utrzymanie: awaria przyjęcia naprawy, serie na emulatorze wstrzymane" trees/utrzymanie.json
-          gh issue create --title "Ewaluator: awaria przyjęcia naprawy ($POWOD, $ID)" \
-            --body "Przyjęcie naprawy w $RUN_URL zakończyło się błędem; wyniki iteracji w artefakcie \`utrzymanie-$GITHUB_RUN_ID\`. Serie na emulatorze wstrzymane (\`trees/utrzymanie.json\`)."
+          NR=$(gh issue create --title "Ewaluator: awaria przyjęcia naprawy ($POWOD, $ID)" \
+          --body "Przyjęcie naprawy w $RUN_URL zakończyło się błędem; wyniki iteracji w artefakcie \`utrzymanie-$GITHUB_RUN_ID\`. Serie na emulatorze wstrzymane (\`trees/utrzymanie.json\`)." | grep -o '[0-9]*$')
+          gh workflow run naprawa-awarii.yml --ref "$DEFAULT_BRANCH" -f issue="$NR"
+
       # transkrypty i wyniki sprawdzeń iteracji
       - if: always() && steps.wstrzymaj.outcome == 'success'
         uses: actions/upload-artifact@v4

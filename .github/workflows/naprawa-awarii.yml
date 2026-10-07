@@ -1,0 +1,122 @@
+# Samonaprawa: issue "Ewaluator: ..." założone przez utrzymanie.yml uruchamia sesję Claude Code, która diagnozuje awarię,
+# naprawia ją na gałęzi domyślnej, zdejmuje trees/utrzymanie.json, puszcza fazę 0 od nowa i zamyka issue.
+# Wyzwala je utrzymanie.yml po założeniu issue (zdarzenie `issues` od GITHUB_TOKEN nie uruchamia workflowów).
+#   gh workflow run naprawa-awarii.yml -f issue=<numer>
+name: naprawa-awarii
+run-name: naprawa awarii #${{ inputs.issue }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      issue:
+        description: 'Numer issue ewaluatora (tytuł zaczyna się od "Ewaluator:")'
+        required: true
+
+concurrency:
+  group: naprawa-awarii
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  actions: write
+  issues: write
+
+env:
+  ISSUE: ${{ inputs.issue }}
+  DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+  GH_REPO: ${{ github.repository }}
+  GH_TOKEN: ${{ github.token }}
+
+jobs:
+  naprawa:
+    if: vars.AUTOPILOT == 'on'
+    runs-on: ubuntu-latest
+    timeout-minutes: 100
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 0
+      # tylko issue od workflowu, nie od przypadkowej osoby (jego treść trafia do promptu); limit subskrypcji
+      # naprawia się czekaniem; po 5 issue w dobie naprawa się zapętla i zostaje dla właściciela
+      - name: Warunki
+        id: w
+        run: |
+          set -eu
+          read -r AUTOR TYTUL < <(gh issue view "$ISSUE" --json author,title --jq '[.author.login,.title]|join(" ")')
+          OD=$(date -u -d '24 hours ago' +%Y-%m-%dT%H:%M:%SZ)
+          N=$(gh issue list --state all --search "Ewaluator in:title created:>=$OD" --json number --jq length)
+          if [ "$AUTOR" != app/github-actions ] || [[ "$TYTUL" != Ewaluator:* ]] || [[ "$TYTUL" == *limitem* ]]; then
+            echo "pomijam: autor=$AUTOR tytuł=$TYTUL"; echo idz=nie >> "$GITHUB_OUTPUT"
+          elif [ "$N" -gt 5 ]; then
+            gh issue comment "$ISSUE" --body "Samonaprawa wstrzymana: $N issue ewaluatora w ciągu doby, to pętla. Wymaga właściciela."
+            echo idz=nie >> "$GITHUB_OUTPUT"
+          else
+            echo idz=tak >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.w.outputs.idz == 'tak'
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+        run: python3 .github/loop/loop.py probe
+      - name: Zależności i Claude Code
+        if: steps.w.outputs.idz == 'tak'
+        run: |
+          sudo apt-get install -y -q tesseract-ocr
+          pip install -q numpy pillow pytest
+          pip install -q torch --index-url https://download.pytorch.org/whl/cpu   # testy silnika importują agenta
+          npm install -g @anthropic-ai/claude-code@2.1.289
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+      - name: Sesja naprawy
+        if: steps.w.outputs.idz == 'tak'
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: 1
+          CLAUDE_CODE_RETRY_WATCHDOG: 1
+          BASH_DEFAULT_TIMEOUT_MS: 3600000
+          BASH_MAX_TIMEOUT_MS: 3600000
+        run: |
+          cp .github/loop/stream_filter.py "$RUNNER_TEMP/"
+          PROMPT="Pracujesz sam, nikt nie odpowie na pytanie. Issue #$ISSUE założył workflow, bo utrzymanie.yml nie naprawiło
+          ewaluatora (most do gry na emulatorze albo symulator) w 3 iteracjach; serie na emulatorze stoją, dopóki istnieje
+          trees/utrzymanie.json. Usuń PRZYCZYNĘ, nie objaw, na gałęzi $DEFAULT_BRANCH (jesteś na niej).
+          1. gh issue view $ISSUE: powód, seria, przebieg (actions/runs/RUN). Pobierz gh run download RUN -n utrzymanie-RUN
+          -D \$RUNNER_TEMP/u (iteracje.md, transkrypty, wyniki sprawdzeń) oraz artefakty serii z gh run list --workflow faza0.yml
+          (gh run download RUN_SERII -p 'seria-*': pomiar.json, moves.jsonl, boot.png, final.png; .png czytaj narzędziem Read).
+          2. Sprawdź zamknięte issue 'Ewaluator' (gh issue list --state closed --search 'Ewaluator in:title', komentarze):
+          jeśli poprzednia naprawa nie pomogła albo sama zepsuła, napraw u źródła, nie dokładaj obejścia. Znane przyczyny:
+          brak bubblewrap/socat/AppArmor (.github/loop/sandbox.sh); dane apki przeżywają adb install -r, więc adb uninstall
+          przed instalacją, ale NIE pm clear (kasuje uprawnienia z -g, apka pyta o powiadomienia, 0 ruchów); skoki licznika
+          OCR (read_counter w bridge.py); import turtle w model.py; testy zależne od daty.
+          3. Najmniejsza zmiana; python -m pytest tests -q musi przejść. Nie luzuj bramki (config.json, max_delta, tolerancje)
+          ani nie scalaj gałęzi evaluator/* na ślepo. Commity bez linii Co-Authored-By i bez wzmianki o narzędziu.
+          git pull --rebase i git push origin HEAD:$DEFAULT_BRANCH. Token nie może zmieniać .github/workflows/*: jeśli
+          przyczyna tego wymaga, opisz dokładną łatkę w komentarzu i zostaw issue otwarte.
+          4. Osobnym commitem git rm trees/utrzymanie.json, push. Dla powodu faza0: gh workflow run faza0.yml --ref
+          $DEFAULT_BRANCH -f proba=1 (nie czekaj na wynik). Dla innych powodów zdjęcie znacznika wystarcza.
+          5. gh issue close $ISSUE --comment: przyczyna z dowodem, zmiana, link do commita, po czym poznać sukces, czego nie
+          zdołałeś sprawdzić. Jeśli niczego nie naprawiłeś: nie zdejmuj znacznika, zostaw issue otwarte z komentarzem
+          (co sprawdzone, co wykluczone). Limit subskrypcji to nie błąd kodu: napisz to w komentarzu."
+          timeout 90m claude -p "$PROMPT" \
+            --model claude-sonnet-5-5 --effort high \
+            --permission-mode acceptEdits \
+            --allowedTools "Read,Edit,Write,Glob,Grep,Bash(git *),Bash(gh *),Bash(python *),Bash(python3 *),Bash(pytest *),Bash(pip install *),Bash(bash *),Bash(unzip *),Bash(mkdir *),Bash(ls *),Bash(rm *)" \
+            --disallowedTools Monitor \
+            --max-turns 200 --output-format stream-json --verbose \
+            2> "$RUNNER_TEMP/claude-stderr.txt" \
+            | python3 "$RUNNER_TEMP/stream_filter.py" "$RUNNER_TEMP" || true
+      # agent nie zamknął issue (limit, wyczerpane tury, brak przyczyny): właściciel widzi to w issue, nie w logach
+      - name: Zgłoś brak rozstrzygnięcia
+        if: always() && steps.w.outputs.idz == 'tak'
+        run: |
+          if [ "$(gh issue view "$ISSUE" --json state --jq .state)" = OPEN ]; then
+            gh issue comment "$ISSUE" --body "Samonaprawa nie zamknęła issue: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID (sprawdź komentarze agenta powyżej i czy istnieje trees/utrzymanie.json)."
+          fi
+      - if: always() && steps.w.outputs.idz == 'tak'
+        uses: actions/upload-artifact@v4
+        with:
+          name: naprawa-awarii-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/stream.ndjson
+            ${{ runner.temp }}/claude-stderr.txt
+          if-no-files-found: ignore
