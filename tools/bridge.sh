@@ -11,11 +11,11 @@ sleep 90
 adb shell settings put global verifier_verify_adb_installs 0
 adb shell settings put global package_verifier_enable 0
 
+# Kolejny odcinek na tym samym emulatorze (iteracje utrzymania) podjąłby starą grę, bo dane apki przeżywają `install -r`.
+# Odinstalowanie, nie `pm clear`: ten kasuje uprawnienia z `-g` i apka pyta o powiadomienia, zanim gra wystartuje (#42).
+adb uninstall "$PKG" >/dev/null 2>&1 || true
 adb install-multiple -r -g assets/*.apk 2>&1 | tee "$OUT/install.txt"
 grep -q Success "$OUT/install.txt" || { echo "INSTALL FAILED"; exit 1; }
-# `install -r` zachowuje dane apki: kolejny odcinek na tym samym emulatorze (iteracje utrzymania) podjąłby
-# poprzednią, niedokończoną albo przegraną grę. Na świeżym emulatorze to nic nie zmienia.
-adb shell pm clear "$PKG" >/dev/null
 
 # Play potrafi zabić grę aktualizacją pakietów także po 90 s — uruchamiamy, aż gra utrzyma pierwszy plan.
 for attempt in 1 2 3; do
