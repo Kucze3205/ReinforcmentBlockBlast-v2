@@ -51,6 +51,8 @@ class SkryptUtrzymaniaTest(unittest.TestCase):
         self.bin.mkdir()
         (self.bin / "python3").write_text('#!/bin/bash\nexec "%s" "$@"\n' % Path(sys.executable).as_posix(), newline="\n")
         (self.bin / "claude").write_text('#!/bin/bash\ncd "$WORK" && eval "$STUB_AKCJA"\n', newline="\n")
+        for atrapa in self.bin.iterdir():   # bez bitu wykonywalnego bash pomija atrapę i woła prawdziwego claude/python3 z PATH
+            atrapa.chmod(0o755)
         self.git = ["git", "-C", str(self.work)]
         self.ident = {"GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t", "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t"}
         subprocess.run(self.git + ["init", "-q"], check=True)
@@ -112,6 +114,13 @@ class SkryptUtrzymaniaTest(unittest.TestCase):
         zadanie = (self.work / ".zadanie" / "ZADANIE.md").read_text(encoding="utf-8")
         self.assertIn("Iteracja 2 z 2", zadanie)
         self.assertIn("### Iteracja 1", zadanie)
+
+    def test_agent_ma_jawnie_dopuszczone_edit_i_write(self):
+        # CLAUDE_CODE_SUBPROCESS_ENV_SCRUB wymusza tryb default: acceptEdits nie działa, a bez wpisu Edit/Write są odrzucane (#43)
+        skrypt = (ROOT / ".github/loop/utrzymanie.sh").read_text(encoding="utf-8")
+        dopuszczone = skrypt.split("--allowedTools", 1)[1].split('"')[1].split(",")
+        self.assertIn("Edit", dopuszczone)
+        self.assertIn("Write", dopuszczone)
 
     def test_kod_naprawy_nie_widzi_poswiadczenia_w_sprawdzeniu(self):
         self.most('echo "[${CLAUDE_CODE_OAUTH_TOKEN:-brak}]" > "$STUB_ODCINEK/../widziane"\n'

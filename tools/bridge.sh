@@ -6,6 +6,11 @@ OUT=bridge-out
 PKG=com.block.juggle
 mkdir -p "$OUT"
 
+# Sklep Play aktualizuje w tle samego siebie, GMS i YouTube przez cały czas pracy emulatora (logcat serii faza0: sesje
+# PackageInstaller po 80 s, 14 i 15 min od startu), a gra zabija się sama (SIGKILL z własnego wątku) 13-50 s po takiej
+# aktualizacji: 4 z 8 partii serii kończyło się "gra nie jest na pierwszym planie". Bez Sklepu nie ma kto instalować.
+adb shell pm disable-user --user 0 com.android.vending 2>&1 | tee "$OUT/play.txt"
+
 # Po pierwszym starcie obraz Play aktualizuje pakiety i zabija procesy — czekamy, aż ucichnie (#14).
 sleep 90
 adb shell settings put global verifier_verify_adb_installs 0

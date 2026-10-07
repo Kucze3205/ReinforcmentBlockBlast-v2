@@ -65,11 +65,13 @@ sesja() {
   export CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1 CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=1 CLAUDE_CODE_RETRY_WATCHDOG=1
   export BASH_DEFAULT_TIMEOUT_MS=$((ITERACJA_MIN * 60000)) BASH_MAX_TIMEOUT_MS=$((ITERACJA_MIN * 60000))
   cd "$WORK" || return 1
+  # CLAUDE_CODE_SUBPROCESS_ENV_SCRUB wymusza tryb default (stderr: "Permission mode forced to default"), więc acceptEdits nie
+  # działa i Edit/Write bez wpisu w allowedTools są odrzucane ("you haven't granted it yet"): iteracje 1 i 3 z #43 nie zapisały nic.
   CLAUDE_CODE_OAUTH_TOKEN=$TOKEN timeout "${ITERACJA_MIN}m" claude -p \
     "Wywołaj skill \`utrzymanie\` narzędziem Skill. Zadanie: .zadanie/ZADANIE.md (iteracja $1 z $ITERACJE)." \
     --model claude-sonnet-5-5 --effort medium \
     --permission-mode acceptEdits \
-    --allowedTools "Read,Glob,Grep,Skill,WebSearch,WebFetch,Bash(git *),Bash(python *),Bash(python3 *),Bash(bash .zadanie/*)" \
+    --allowedTools "Read,Edit,Write,Glob,Grep,Skill,WebSearch,WebFetch,Bash(git *),Bash(python *),Bash(python3 *),Bash(bash .zadanie/*)" \
     --disallowedTools Monitor \
     --settings "$ZAUFANE/ustawienia.json" \
     --max-turns 120 --output-format stream-json --verbose \

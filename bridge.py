@@ -20,7 +20,7 @@ import numpy as np
 from PIL import Image, ImageDraw
 
 from board import Board
-from pieces import Piece
+from pieces import PIECE_POOL, Piece
 import policies
 
 OUT = "bridge-out"
@@ -35,6 +35,7 @@ CEL = int(os.environ.get("CEL", 0))  # licznik apki kończący partię; 0 = bez 
 LIMIT_S = float(os.environ.get("LIMIT_MINUT", 0)) * 60  # 0 = bez limitu
 DRAG_GAIN = 1.5  # zmierzone: klocek przesuwa się 1,5 px na 1 px palca
 LIFT = 80.6  # środek podniesionego klocka jest tyle px nad środkiem klocka na tacce
+MAX_KLOCEK = max(max(len(p.shape), len(p.shape[0])) for p in PIECE_POOL)  # żaden klocek nie ma boku dłuższego
 
 
 def adb(*args):
@@ -83,6 +84,18 @@ def stable_state(tries=6):
             break
         prev = key
     return img, grid, tray
+
+
+def tray_ok(slots):
+    """Ekran końca gry, okno nad grą i launcher dają "klocki" o bokach, jakich klocek nie ma (w logach faza0: 9x7, 7x5, 8x5).
+    Taka tacka nie jest odczytem tacki: nie wolno jej zagrać ani zapisać (miara klocków liczyłaby ją jako nieznane)."""
+    return all(s is None or max(len(s[0]), len(s[0][0])) <= MAX_KLOCEK for s in slots)
+
+
+def readable(state):
+    """Stan z odczytu, z pustą tacką, gdy tacka nie jest czytelna: bez klocków nie ma ruchu, a koniec gry rozstrzyga ponowny odczyt."""
+    img, grid, slots = state
+    return img, grid, slots if tray_ok(slots) else [None] * 3
 
 
 def is_block(img):
@@ -227,7 +240,7 @@ def drop_old_images(n):
 def play(max_moves, st, t0):
     policy = policies.build("weights" if os.path.isdir("weights") and os.listdir("weights") else None)
     log = open(os.path.join(OUT, "moves.jsonl"), "w")
-    img, grid, slots = settled_state()
+    img, grid, slots = readable(settled_state())
     ok_streak = best_streak = last_n = 0
     for n in range(max_moves):
         score = read_counter(img, st["licznik"], max(1, n - last_n))
@@ -259,7 +272,7 @@ def play(max_moves, st, t0):
             # Brak ruchu wg odczytu to przegrana dopiero, gdy ten sam odczyt po chwili się utrzyma:
             # animacja i błąd odczytu też dają pustą listę.
             time.sleep(3)
-            img, grid, slots = stable_state()
+            img, grid, slots = readable(stable_state())
             again = [Piece(s[0], f"slot{i}", -1) if s else None for i, s in enumerate(slots)]
             probe = Board()
             probe.grid = [row[:] for row in grid]
@@ -274,7 +287,7 @@ def play(max_moves, st, t0):
         expected = simulate(board, pieces[i], x, y)
         info, aim = drag(slots[i][1], pieces[i], x, y)
         Image.fromarray(aim.astype(np.uint8)).save(os.path.join(OUT, f"{n:03d}_aim.png"))
-        img, observed, slots = stable_state()
+        img, observed, slots = readable(stable_state())
         ok = observed == expected
         grid = observed
         ok_streak = ok_streak + 1 if ok else 0

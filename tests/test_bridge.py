@@ -91,6 +91,24 @@ class MostTest(unittest.TestCase):
         bridge.main(100000)
         self.assertEqual(self.pomiar()["koniec"], "przerwanie")
 
+    def test_ekran_konca_gry_nie_trafia_do_logu_jako_tacka(self):
+        # po przegranej ekran końca gry czytany jak tacka daje "klocki" 9x7 (logi faza0): miara klocków liczyła je jako nieznane
+        smiec = [([[1] * 7 for _ in range(9)], (40, 500)), ([[1] * 7, [1] * 7], (140, 500)), None]
+        self.assertFalse(bridge.tray_ok(smiec))
+        self.assertTrue(bridge.tray_ok(self.screen()[2]))
+        prawdziwy = self.screen
+        bridge.settled_state = bridge.stable_state = lambda: (
+            (self.img, [row[:] for row in self.game.board.grid], smiec) if self.game.done else prawdziwy())
+        bridge.main(100000)
+        p = self.pomiar()
+        self.assertEqual(p["koniec"], "przegrana")
+        self.assertEqual(p["ruchy"], self.game.placements)
+        wpisy = [json.loads(l) for l in (Path(self.tmp.name) / "moves.jsonl").read_text().splitlines()]
+        self.assertEqual(wpisy[-1]["tray"], [None, None, None])
+        self.assertIn("end", wpisy[-1])
+        for w in wpisy:
+            self.assertTrue(all(s is None or max(len(s), len(s[0])) <= bridge.MAX_KLOCEK for s in w["tray"]))
+
     def test_pusta_lista_ruchow_z_odczytu_nie_jest_przegrana_gdy_odczyt_sie_zmienia(self):
         # pierwszy odczyt: plansza pełna (animacja), drugi: poprawny stan gry
         pelna = [[1] * 8 for _ in range(8)]
