@@ -32,6 +32,18 @@ def line_bonus(lines):
     return 10 * lines * (lines - 1)
 
 
+def combo_unit(combo):
+    """Mnożnik jednostki bonusu rośnie ze streakiem: combo 1-5 -> 1, 6-10 -> 1,5, od 11 -> 2.
+
+    Zmierzone na logach faza0: 1 linia daje 10*combo do combo 5, 15*combo dla 6-10 i 20*combo od 11.
+    """
+    if combo <= 5:
+        return 10
+    if combo <= 10:
+        return 15
+    return 20
+
+
 def clear_points(combo, lines):
-    """Punkty za czyszczenie: combo (po inkrementacji) mnoży bonus bazowy."""
-    return combo * line_bonus(lines)
+    """Punkty za czyszczenie: combo (po inkrementacji) mnoży bonus bazowy w jednostce combo_unit."""
+    return combo * line_bonus(lines) * combo_unit(combo) // 10

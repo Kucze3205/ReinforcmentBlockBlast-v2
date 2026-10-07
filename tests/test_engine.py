@@ -66,6 +66,28 @@ class TestScoringFormula(unittest.TestCase):
         self.assertEqual(clear_points(0, 2), 0)
 
 
+class TestMeasuredComboLadder(unittest.TestCase):
+    """Wartości z logów faza0: partia 5 n62 (300), n66 (520), n70 (2040); partia 1 n38 (380)."""
+
+    def test_bonus_unit_grows_with_combo(self):
+        self.assertEqual(clear_points(5, 1), 50)
+        self.assertEqual(clear_points(6, 1), 90)
+        self.assertEqual(clear_points(10, 2), 300)
+        self.assertEqual(clear_points(11, 1), 220)
+        self.assertEqual(clear_points(13, 2), 520)
+        self.assertEqual(clear_points(17, 3), 2040)
+
+    def test_combo_grows_by_lines_cleared(self):
+        game = Game(seed=1)
+        game.board.grid = [[1] * 8 for _ in range(2)] + [[0] * 8 for _ in range(6)]
+        game.board.grid[0][0] = game.board.grid[1][0] = 0
+        game.pieces = [p for p in PIECE_POOL if p.name == "beam2-1"][:1] + [None, None]
+        game.round_placement = 2
+        game.board.place_piece(game.pieces[0], 0, 0)
+        game.apply_placement(0)
+        self.assertEqual(game.combo, 2)
+
+
 class TestComboMechanics(unittest.TestCase):
     def setUp(self):
         self.game = Game(seed=42)
@@ -180,16 +202,20 @@ class TestPiecePool(unittest.TestCase):
         }
         self.assertEqual(actual, expected)
 
-    def test_sampling_is_uniform_over_types_not_poses(self):
-        # R-8: typ 3x3 (1 orientacja) musi wypadać ~8x częściej niż konkretna poza L.
+    def test_sampling_follows_measured_pose_counts(self):
+        # Rozkład zmierzony w logach faza0 zastąpił model 1/15 na typ: częstość poz ~ POSE_COUNTS.
+        from generator import POSE_COUNTS
+
         gen = Generator(1234)
+        n = 20000
         counts = {}
-        for _ in range(20000):
+        for _ in range(n):
             piece = gen._next_piece()
             counts[piece.name] = counts.get(piece.name, 0) + 1
-        square3 = counts.get("square3", 0)
-        l_pose = counts.get("L-0", 0)
-        self.assertGreater(square3 / max(l_pose, 1), 5.0)
+        total = sum(POSE_COUNTS.values())
+        for name in ("square2", "beam4-1", "L-7", "diag3-0"):
+            expected = n * POSE_COUNTS[name] / total
+            self.assertAlmostEqual(counts.get(name, 0), expected, delta=5 * expected ** 0.5 + 1)
 
 
 class TestBenchmarkPrerequisites(unittest.TestCase):
