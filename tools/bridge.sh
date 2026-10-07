@@ -16,6 +16,9 @@ grep -q Success "$OUT/install.txt" || { echo "INSTALL FAILED"; exit 1; }
 # `install -r` zachowuje dane apki: kolejny odcinek na tym samym emulatorze (iteracje utrzymania) podjąłby
 # poprzednią, niedokończoną albo przegraną grę. Na świeżym emulatorze to nic nie zmienia.
 adb shell pm clear "$PKG" >/dev/null
+# pm clear zeruje też przyznane uprawnienia; od wersji 10.7.5 gra pyta o powiadomienia systemowym oknem,
+# które zabiera pierwszy plan ("gra nie jest na pierwszym planie" w ruchu 0).
+adb shell pm grant "$PKG" android.permission.POST_NOTIFICATIONS 2>/dev/null
 
 # Play potrafi zabić grę aktualizacją pakietów także po 90 s — uruchamiamy, aż gra utrzyma pierwszy plan.
 for attempt in 1 2 3; do
@@ -23,6 +26,12 @@ for attempt in 1 2 3; do
   sleep 25
   adb shell input tap 160 437   # Accept Terms of Use (na planszy tutorialu nic nie robi)
   sleep 15
+  # gdyby okno uprawnień mimo to się pojawiło: Allow
+  for _ in 1 2 3; do
+    adb shell dumpsys window | grep mCurrentFocus | grep -qi permissioncontroller || break
+    adb shell input tap 160 348
+    sleep 3
+  done
   adb shell dumpsys window | grep -q "mCurrentFocus.*$PKG" && break
   echo "gra nie na pierwszym planie (próba $attempt)"
 done

@@ -65,6 +65,12 @@ class TestScoringFormula(unittest.TestCase):
         self.assertEqual(clear_points(3, 2), 60)
         self.assertEqual(clear_points(0, 2), 0)
 
+    def test_high_combo_pays_more(self):
+        # logi mostu: od combo 6 licznik apki daje ok. 2,2x więcej niż wzór
+        self.assertEqual(clear_points(5, 1), 50)
+        self.assertEqual(clear_points(10, 1), 220)
+        self.assertEqual(clear_points(12, 2), 528)
+
 
 class TestComboMechanics(unittest.TestCase):
     def setUp(self):

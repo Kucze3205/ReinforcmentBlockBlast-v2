@@ -143,10 +143,14 @@ def read_score(img):
 MAX_SKOK = 8000  # największy wiarygodny przyrost licznika za jeden ruch; błędy OCR w logach faza0: +10003, +10042, +11173, prawdziwe duże ruchy do ok. 5700
 
 
-def read_counter(img, last, gap=1):
+MAX_NA_LINIE = 1000  # górna granica przyrostu licznika za jedną wyczyszczoną linię
+
+
+def read_counter(img, last, gap=1, limit=None):
     """Licznik wyniku odporny na OCR w trakcie animacji: dwa równe odczyty z kolejnych zrzutów,
     wartość niemalejąca i bez nierealnego skoku względem ostatniej przyjętej (`gap` ruchów temu).
-    Zły odczyt (zgubiona/doklejona cyfra) zwraca None zamiast fałszywego przyrostu."""
+    Zły odczyt (zgubiona/doklejona cyfra) zwraca None zamiast fałszywego przyrostu.
+    `limit` zastępuje MAX_SKOK * gap, gdy wiadomo, ile ruchy od `last` mogły co najwyżej dać."""
     prev = read_score(img)
     for _ in range(4):
         time.sleep(0.4)
@@ -158,7 +162,7 @@ def read_counter(img, last, gap=1):
         return None
     if prev is None:
         return None
-    if last is not None and not last <= prev <= last + MAX_SKOK * gap:
+    if last is not None and not last <= prev <= last + (MAX_SKOK * gap if limit is None else limit):
         return None
     return prev
 
@@ -228,12 +232,13 @@ def play(max_moves, st, t0):
     policy = policies.build("weights" if os.path.isdir("weights") and os.listdir("weights") else None)
     log = open(os.path.join(OUT, "moves.jsonl"), "w")
     img, grid, slots = settled_state()
-    ok_streak = best_streak = last_n = 0
+    ok_streak = best_streak = last_n = room = 0
     for n in range(max_moves):
-        score = read_counter(img, st["licznik"], max(1, n - last_n))
+        score = read_counter(img, st["licznik"], max(1, n - last_n), room if n > last_n else None)
         if score is not None:
             st["licznik"] = score
             last_n = n
+            room = 0
         st["ruchy"] = n
         if CEL and (st["licznik"] or 0) >= CEL:
             st.update(koniec="cel", przyczyna=None)
@@ -272,6 +277,11 @@ def play(max_moves, st, t0):
         game = SimpleNamespace(board=board, pieces=pieces, combo=0)
         i, x, y = policy.act(game, moves)
         expected = simulate(board, pieces[i], x, y)
+        cells = sum(map(sum, pieces[i].shape))
+        # ruch bez czyszczenia daje tylko komórki klocka; bez tego fałszywe "5"->"9" w OCR dawało +4000 w jednym ruchu
+        cleared = sum(map(sum, grid)) + cells - sum(map(sum, expected))
+        # jedna linia daje w logach najwyżej ok. 400 (combo 15), 5->9 w OCR dał +4026 za jedną linię
+        room += cells + 5 + MAX_NA_LINIE * -(-cleared // 8)
         info, aim = drag(slots[i][1], pieces[i], x, y)
         Image.fromarray(aim.astype(np.uint8)).save(os.path.join(OUT, f"{n:03d}_aim.png"))
         img, observed, slots = stable_state()

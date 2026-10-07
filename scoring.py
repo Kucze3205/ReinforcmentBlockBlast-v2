@@ -32,6 +32,16 @@ def line_bonus(lines):
     return 10 * lines * (lines - 1)
 
 
+# Logi mostu (faza0, odcinek 150 ruchów): combo 1-5 zgadza się ze wzorem co do punktu, od combo 6 licznik apki
+# daje 1,5-3x więcej (np. combo 10: 220 za linię zamiast 100). Mechanizmu nie znamy (kolor linii? poziom?),
+# stała dopasowana tak, by suma punktów zgadzała się z licznikiem apki.
+HIGH_COMBO_FROM = 6
+HIGH_COMBO_FACTOR = 2.2
+
+
 def clear_points(combo, lines):
     """Punkty za czyszczenie: combo (po inkrementacji) mnoży bonus bazowy."""
-    return combo * line_bonus(lines)
+    points = combo * line_bonus(lines)
+    if combo >= HIGH_COMBO_FROM:
+        points = round(points * HIGH_COMBO_FACTOR)
+    return points
