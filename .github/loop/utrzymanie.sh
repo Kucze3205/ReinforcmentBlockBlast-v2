@@ -96,6 +96,13 @@ petla() {
       echo "limit subskrypcji: czekam ${czeka}s, iteracja $i się nie liczy"
       czekano=$((czekano + 1)); sleep "$czeka"; continue
     fi
+    if [ "${czeka:-0}" -gt 0 ]; then
+      # limit za daleko albo po dwóch czekaniach nadal trwa: kolejne iteracje spaliłyby godziny na ponawianiu 429
+      echo limit > "$WYNIK/status"
+      date -u -d "@$(( $(date +%s) + czeka ))" +%Y-%m-%dT%H:%M:%SZ > "$WYNIK/limit-do"
+      echo "### Iteracja $i: limit subskrypcji do $(cat "$WYNIK/limit-do"), naprawa wstrzymana" >> "$WYNIK/iteracje.md"
+      break
+    fi
     cd "$WORK" && git add -A && git commit -q -m "Utrzymanie: niezatwierdzone zmiany iteracji $i" 2>/dev/null
     local zle
     zle=$(git diff --name-only "$baza" HEAD | python3 "$KAL" dozwolone)

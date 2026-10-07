@@ -5,6 +5,7 @@ Log kroku jest publiczny: bez tool_result i thinking. Nigdy nie kończy się bł
 bo machine_cause w loop.py parsuje ten plik jako jeden obiekt JSON)."""
 import json
 import os
+import subprocess
 import sys
 
 
@@ -20,6 +21,21 @@ def show(ev):
             print("🔧 %s %s" % (b.get("name"), str(arg).replace("\n", " ")[:150]), flush=True)
 
 
+def zakoncz_sesje():
+    # SIGTERM do `timeout`, który przekazuje go do claude; sam koniec filtra zabiłby claude dopiero przy następnym zapisie
+    subprocess.run(["pkill", "-TERM", "-f", "claude -p"], check=False)
+
+
+def limit_odrzucony(ev):
+    """CLAUDE_CODE_RETRY_WATCHDOG ponawia też 429 z limitu subskrypcji: bez tego sesja wisi do `timeout`, a loop.py
+    nie widzi limitu (brak `result`). Zdarzenie `rejected` to jedyny sygnał; termin resetu bierzemy z niego."""
+    info = ev.get("rate_limit_info") or {}
+    if ev.get("type") != "rate_limit_event" or info.get("status") != "rejected" or info.get("isUsingOverage"):
+        return None
+    return {"type": "result", "is_error": True, "terminal_reason": "rate_limit",
+            "result": "hit your %s limit (rate_limit rejected)" % info.get("rateLimitType", ""), "resetsAt": info.get("resetsAt")}
+
+
 def main(out):
     result = None
     with open(os.path.join(out, "stream.ndjson"), "w") as raw:
@@ -27,7 +43,12 @@ def main(out):
             raw.write(line)
             try:
                 ev = json.loads(line)
-                if ev.get("type") == "result":
+                odrzucony = limit_odrzucony(ev) if result is None else None
+                if odrzucony:
+                    result = odrzucony
+                    print("⛔ limit subskrypcji: sesja kończona", flush=True)
+                    zakoncz_sesje()
+                elif ev.get("type") == "result":
                     result = ev
                     print("✅ tury=%s koszt=$%s błąd=%s" % (ev.get("num_turns"), ev.get("total_cost_usd"), ev.get("is_error")), flush=True)
                 else:

@@ -1,9 +1,13 @@
 """Testy czystej logiki klocków pętli: przyczyna maszynowa, rekord węzła i historia prób."""
+import contextlib
 import importlib.util
+import io
 import json
 import os
+import sys
 import tempfile
 import unittest
+from unittest import mock
 from datetime import timedelta
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -127,6 +131,7 @@ class RekordTest(Drzewo):
         self.assertEqual(r["koszt"], {"tury": 40, "usd": 1.5, "minuty": 90.0})
         self.assertEqual(r["sesje"][0]["przyczyna"], "ok")
 
+    @mock.patch.object(loop, "now", lambda: T0)   # "resets 1pm" liczy się od zegara; bez tego test zależy od dnia uruchomienia
     def test_limit_parkuje_a_wznowienie_liczy_oczekiwanie(self):
         loop.start(self.base, 1, "1.1", 1, "K", T0)
         a = loop.finish(self.base, 1, "1.1", self.wynik({"is_error": True, "result": "You've hit your session limit · resets 1pm (UTC)"}),
@@ -194,3 +199,43 @@ class HistoriaTest(Drzewo):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class FiltrStrumieniaTest(unittest.TestCase):
+    """CLAUDE_CODE_RETRY_WATCHDOG ponawia także 429 z limitu subskrypcji: sesja nie kończy się wynikiem, tylko wisi do `timeout`."""
+
+    def odpal(self, zdarzenia):
+        sf_spec = importlib.util.spec_from_file_location("stream_filter", os.path.join(ROOT, ".github", "loop", "stream_filter.py"))
+        sf = importlib.util.module_from_spec(sf_spec)
+        sf_spec.loader.exec_module(sf)
+        ubito = []
+        sf.zakoncz_sesje = lambda: ubito.append(True)
+        stdin = sys.stdin
+        sys.stdin = io.StringIO("".join(json.dumps(z) + "\n" for z in zdarzenia))
+        try:
+            with tempfile.TemporaryDirectory() as out:
+                with contextlib.redirect_stdout(io.StringIO()):
+                    sf.main(out)
+                plik = os.path.join(out, "claude-execution-output.json")
+                return ubito, plik if os.path.exists(plik) else None, (open(plik, encoding="utf-8").read() if os.path.exists(plik) else None)
+        finally:
+            sys.stdin = stdin
+
+    def test_odrzucony_limit_konczy_sesje_z_terminem_resetu(self):
+        t = loop.now()
+        reset = int((t + timedelta(hours=30)).timestamp())
+        info = {"status": "rejected", "resetsAt": reset, "rateLimitType": "seven_day", "isUsingOverage": False}
+        ubito, plik, tresc = self.odpal([{"type": "rate_limit_event", "rate_limit_info": info}])
+        self.assertEqual(ubito, [True])
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False, encoding="utf-8") as fh:
+            fh.write(tresc)
+        try:
+            self.assertAlmostEqual(loop.limit_s(fh.name, "143", t), 30 * 3600, delta=2)
+        finally:
+            os.unlink(fh.name)
+
+    def test_ostrzezenie_o_limicie_nie_przerywa_sesji(self):
+        info = {"status": "allowed_warning", "resetsAt": 1791313200, "rateLimitType": "seven_day"}
+        ubito, plik, _ = self.odpal([{"type": "rate_limit_event", "rate_limit_info": info}])
+        self.assertEqual(ubito, [])
+        self.assertIsNone(plik)

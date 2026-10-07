@@ -167,6 +167,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          RUN_DANE: ${{ inputs.run }}
         run: |
           set -eu
           cd loop
@@ -206,6 +207,22 @@ jobs:
             printf '{"stan":"wstrzymane","powod":"%s","id":"%s","galaz":"%s","przebieg":"%s"}\n' \
               "$POWOD" "$ID" "$GALAZ" "$RUN_URL" > trees/utrzymanie.json
             bash .github/loop/zapisz.sh "utrzymanie: naprawa nieudana, serie na emulatorze wstrzymane" trees/utrzymanie.json
+            if [ "$STATUS" = limit ]; then
+              TYTUL="Ewaluator: naprawa wstrzymana limitem subskrypcji ($POWOD, $ID)"
+              {
+                echo "Limit subskrypcji Claude Code wyczerpany do $(cat "$WYNIK/limit-do" 2>/dev/null || echo '?'); naprawa przerwana bez oceny wyniku."
+                echo "Po resecie usuń \`trees/utrzymanie.json\` i uruchom ją ponownie:"
+                echo
+                echo "    gh workflow run utrzymanie.yml -f powod=$POWOD -f id=$ID -f run=$RUN_DANE"
+                echo
+                echo "- przebieg: $RUN_URL"
+                echo
+                echo "## Iteracje"
+                echo
+                cat "$WYNIK/iteracje.md" 2>/dev/null || echo "(brak)"
+              } > "$RUNNER_TEMP/zgloszenie.md"
+            else
+            TYTUL="Ewaluator: naprawa nieudana ($POWOD, $ID)"
             {
               echo "Naprawa ewaluatora nie przeszła bramki po $ITERACJE iteracjach (status: $STATUS)."
               echo
@@ -222,7 +239,8 @@ jobs:
               echo
               cat "$WYNIK/iteracje.md" 2>/dev/null || echo "(brak)"
             } > "$RUNNER_TEMP/zgloszenie.md"
-            gh issue create --title "Ewaluator: naprawa nieudana ($POWOD, $ID)" --body-file "$RUNNER_TEMP/zgloszenie.md"
+            fi
+            gh issue create --title "$TYTUL" --body-file "$RUNNER_TEMP/zgloszenie.md"
           fi
       # awaria samego przyjęcia (np. patch nie nakłada się na przesuniętą gałąź) nie może zostawić znacznika `naprawa`
       - name: Znacznik po awarii przyjęcia

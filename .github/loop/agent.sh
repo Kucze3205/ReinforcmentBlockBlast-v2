@@ -15,7 +15,8 @@ fi
 export CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1
 # poświadczenie zostaje w procesie Claude Code, znika z Basha i hooków
 export CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=1
-# przeciążenia API (429/529) ponawiane zamiast końca sesji; limit subskrypcji i tak kończy sesję
+# przeciążenia API (429/529) ponawiane zamiast końca sesji; to ponawia też limit subskrypcji, więc stream_filter.py
+# sam kończy sesję na zdarzeniu rate_limit `rejected` (inaczej wisi do `timeout`, a loop.py nie widzi limitu)
 export CLAUDE_CODE_RETRY_WATCHDOG=1
 # trening na pierwszym planie: domyślnie Bash ucina po 2 min
 export BASH_DEFAULT_TIMEOUT_MS=$((SESJA_MIN * 60000)) BASH_MAX_TIMEOUT_MS=$((SESJA_MIN * 60000))
