@@ -7,6 +7,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -158,6 +159,16 @@ class BramkaTest(unittest.TestCase):
         self.assertTrue(self.bramka()["ok"])
         (self.odcinek / "pomiar.json").write_text(json.dumps({"koniec": "przerwanie", "przyczyna": "gra nie jest na pierwszym planie"}))
         self.assertFalse(self.bramka()["ok"])
+
+    def test_chi2_klockow_odcinka_nie_blokuje(self):
+        oryginal = kal.klocki
+
+        def klocki(partie, mod, k):
+            wynik = oryginal(partie, mod, k)
+            return dict(wynik, p=0.0002, ok=False) if len(partie) == 1 else wynik
+
+        with mock.patch.object(kal, "klocki", klocki):
+            self.assertTrue(self.bramka()["ok"])
 
     def test_krotki_odcinek_bez_danych_nie_blokuje_ale_zly_blokuje(self):
         (self.odcinek / "moves.jsonl").write_text("\n".join(json.dumps(w) for w in zagraj(5)[:6]), encoding="utf-8")

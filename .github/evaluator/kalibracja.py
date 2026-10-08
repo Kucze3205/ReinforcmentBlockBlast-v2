@@ -218,7 +218,9 @@ def most_zdrowy(wyjscie):
 
 def bramka(kod, odcinek, zestaw=None):
     """Kryterium iteracji: zestaw kontrolny w tolerancji (twardo: brak danych = porażka) i odcinek na emulatorze
-    ze zdrowym mostem; miary odcinka liczą się tylko, gdy ma dość danych (krótka przegrana je zwykle nie ma)."""
+    ze zdrowym mostem; w odcinku liczy się tempo i odczyt kształtów (`nieznane`), nie χ² klocków: rozkład klocków rośnie
+    z numerem rundy, więc stały generator nie zgadza się z pojedynczą partią; χ² sprawdza tylko zestaw kontrolny.
+    Miary odcinka liczą się tylko, gdy ma dość danych (krótka przegrana je zwykle nie ma)."""
     k = cfg()["kalibracja"]
     mod = sim(kod)
     z = mierz(logi(zestaw or ZESTAW), mod, k)
@@ -231,7 +233,8 @@ def bramka(kod, odcinek, zestaw=None):
         powody.append("zestaw kontrolny poza tolerancją albo bez danych")
     if not zdrowy:
         powody.append("most: " + jak)
-    if o["tempo"]["ok"] is False or o["klocki"]["ok"] is False:
+    kl = o["klocki"]
+    if o["tempo"]["ok"] is False or kl["nieznane"] > k["nieznane_max"] * (kl["n"] + kl["nieznane"]):
         powody.append("odcinek poza tolerancją")
     return {"ok": not powody, "powody": powody, "zestaw": z, "odcinek": dict(o, most=jak)}
 
