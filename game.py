@@ -28,6 +28,8 @@ class Game:
         self.score = 0
         self.combo = 0
         self.combo_counter = COMBO_COUNTER_BASE
+        self.since_clear = 0         # postawienia bez czyszczenia od ostatniego czyszczenia
+        self.combo_expiring = False  # licznik wygasł, combo czeka na jeden ruch łaski
         self.round_placement = 0
         self.placements = 0          # przeżycie: liczba udanych postawień w partii
         self.last_lines_cleared = 0  # linie wyczyszczone ostatnim postawieniem
@@ -80,15 +82,38 @@ class Game:
             # po resecie daje combo=1 niezależnie od liczby linii (bonus B(l) już ją zawiera)
             # zmierzone: czyszczenie 3 kolumn bez wierszy podnosi combo tylko o 1 (faza0-1 n77, faza0-3 n41,
             # faza0-6 n179: 20->21, 20->21, 29->30), 3 wiersze albo mieszane o 3
-            gain = 1 if len(cols) >= 3 and not rows else lines
-            self.combo = 1 if self.combo == 0 else self.combo + gain
+            gain = 1 if len(cols) >= 3 and not rows and self.combo >= 10 else lines
+            # zmierzone: wielolinijkowe czyszczenie podnosi combo o liczbę linii tylko do 3 postawień od
+            # poprzedniego czyszczenia, później o 1 (faza0-2 n59 i n63, faza0-6 n100: gap 4-6 -> +1)
+            if self.since_clear >= 3:
+                gain = 1
+            if self.combo_expiring:
+                # zmierzone: ruch po wygaśnięciu licznika ratuje combo tylko czyszczenie >= 2 linii
+                # i tylko o 1 (faza0-2 n91, faza0-6 n100, faza0-7 n46); pojedyncza linia zaczyna od 1
+                gain = 1
+                self.combo = self.combo + 1 if lines >= 2 else 1
+            else:
+                self.combo = 1 if self.combo == 0 else self.combo + gain
+            self.combo_expiring = False
+            self.since_clear = 0
             self.combo_counter = COMBO_COUNTER_BASE + remaining
             gained += clear_points(self.combo, lines)
-        elif self.combo_counter <= 1:
+        elif self.combo_expiring or (self.combo_counter <= 1 and self.combo == 0):
             self.combo = 0
+            self.combo_expiring = False
             self.combo_counter = COMBO_COUNTER_BASE
+        elif self.combo_counter <= 1:
+            # zmierzone: combo 2 w tej chwili nie dostaje ruchu łaski (faza0-10 n7, faza0-6 n49), combo >= 3 tak
+            if self.combo >= 3:
+                self.combo_expiring = True
+            else:
+                self.combo = 0
+                self.combo_counter = COMBO_COUNTER_BASE
         else:
             self.combo_counter -= 1
+
+        if lines == 0:
+            self.since_clear += 1
 
         self.board.clear_lines(rows, cols)
 

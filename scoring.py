@@ -14,8 +14,8 @@ Nic z tego nie jest pomiarem na oryginale — patrz docs/calibration-assumptions
 
 FULL_CLEAR_BONUS = 300
 
-# Najniższe combo, przy którym apka wypłaca bonus za pustą planszę (zmierzone: 5 nie, 7 tak).
-FULL_CLEAR_MIN_COMBO = 6
+# Najniższe combo, przy którym apka wypłaca bonus za pustą planszę (zmierzone w logach: combo 1 i 2 nie, 4 tak).
+FULL_CLEAR_MIN_COMBO = 4
 
 # Ile postawień bez czyszczenia przeżywa combo, gdy tacka jest pusta/1/2 klocki.
 COMBO_COUNTER_BASE = 3
