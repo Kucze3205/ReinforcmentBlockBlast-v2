@@ -47,6 +47,19 @@ def combo_unit(combo):
     return 20
 
 
-def clear_points(combo, lines):
+# Mnożnik bonusu za czyszczenie maleje z łącznym wynikiem partii (procenty). Zmierzone na logach faza0
+# (partie 1, 8, 9): 100% do ~6000 pkt, 80% od ~6000, 60% od ~6600, 40% od ~7000, 30% od ~8500;
+# dalej 30% aż do 997 tys. pkt. Progi znane z dokładnością do przedziału między sąsiednimi ruchami.
+SCORE_DECAY = ((8500, 30), (7000, 40), (6600, 60), (6000, 80))
+
+
+def score_decay(score):
+    for threshold, percent in SCORE_DECAY:
+        if score >= threshold:
+            return percent
+    return 100
+
+
+def clear_points(combo, lines, score=0):
     """Punkty za czyszczenie: combo (po inkrementacji) mnoży bonus bazowy w jednostce combo_unit."""
-    return combo * line_bonus(lines) * combo_unit(combo) // 10
+    return combo * line_bonus(lines) * combo_unit(combo) * score_decay(score) // 1000

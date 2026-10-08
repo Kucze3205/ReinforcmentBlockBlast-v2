@@ -91,13 +91,14 @@ class Game:
                 # zmierzone: ruch po wygaśnięciu licznika ratuje combo tylko czyszczenie >= 2 linii
                 # i tylko o 1 (faza0-2 n91, faza0-6 n100, faza0-7 n46); pojedyncza linia zaczyna od 1
                 gain = 1
-                self.combo = self.combo + 1 if lines >= 2 else 1
+                # faza0-1 n55: 3 linie po wygaśnięciu dały +2 (11->13), 2 linie +1: przyrost = linie - 1
+                self.combo = self.combo + lines - 1 if lines >= 2 else 1
             else:
                 self.combo = 1 if self.combo == 0 else self.combo + gain
             self.combo_expiring = False
             self.since_clear = 0
             self.combo_counter = COMBO_COUNTER_BASE + remaining
-            gained += clear_points(self.combo, lines)
+            gained += clear_points(self.combo, lines, self.score)
         elif self.combo_expiring or (self.combo_counter <= 1 and self.combo == 0):
             self.combo = 0
             self.combo_expiring = False
