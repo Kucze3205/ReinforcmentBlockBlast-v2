@@ -10,6 +10,7 @@ from generator import Generator
 from scoring import (
     COMBO_COUNTER_BASE,
     FULL_CLEAR_BONUS,
+    FULL_CLEAR_MIN_COMBO,
     clear_points,
     placement_points,
 )
@@ -75,7 +76,12 @@ class Game:
         remaining = sum(1 for p in self.pieces if p is not None)
 
         if lines > 0:
-            self.combo += lines   # zmierzone: combo rośnie o liczbę linii, nie o 1
+            # zmierzone: w trwającym streaku combo rośnie o liczbę linii, ale pierwsze czyszczenie
+            # po resecie daje combo=1 niezależnie od liczby linii (bonus B(l) już ją zawiera)
+            # zmierzone: czyszczenie 3 kolumn bez wierszy podnosi combo tylko o 1 (faza0-1 n77, faza0-3 n41,
+            # faza0-6 n179: 20->21, 20->21, 29->30), 3 wiersze albo mieszane o 3
+            gain = 1 if len(cols) >= 3 and not rows else lines
+            self.combo = 1 if self.combo == 0 else self.combo + gain
             self.combo_counter = COMBO_COUNTER_BASE + remaining
             gained += clear_points(self.combo, lines)
         elif self.combo_counter <= 1:
@@ -86,7 +92,9 @@ class Game:
 
         self.board.clear_lines(rows, cols)
 
-        if not any(any(row) for row in self.board.grid):
+        # zmierzone: apka nie daje bonusu przy combo <= 5 (faza0-10 n2, faza0-5 n10, odcinek n5: combo 2, 5, 2),
+        # daje przy combo >= 7 (faza0-6 n15, faza0-4 n24, faza0-10 n61 i n64)
+        if self.combo >= FULL_CLEAR_MIN_COMBO and not any(any(row) for row in self.board.grid):
             gained += FULL_CLEAR_BONUS
 
         if self.round_placement == 3:

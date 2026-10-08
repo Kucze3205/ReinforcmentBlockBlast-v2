@@ -85,7 +85,32 @@ class TestMeasuredComboLadder(unittest.TestCase):
         game.round_placement = 2
         game.board.place_piece(game.pieces[0], 0, 0)
         game.apply_placement(0)
-        self.assertEqual(game.combo, 2)
+        # pierwsze czyszczenie po resecie daje combo=1, niezależnie od liczby linii
+        self.assertEqual(game.combo, 1)
+
+    def test_combo_grows_by_lines_cleared_in_streak(self):
+        game = Game(seed=1)
+        game.combo = 3
+        game.board.grid = [[1] * 8 for _ in range(2)] + [[0] * 8 for _ in range(6)]
+        game.board.grid[0][0] = game.board.grid[1][0] = 0
+        game.pieces = [p for p in PIECE_POOL if p.name == "beam2-1"][:1] + [None, None]
+        game.round_placement = 2
+        game.board.place_piece(game.pieces[0], 0, 0)
+        game.apply_placement(0)
+        self.assertEqual(game.combo, 5)
+
+    def test_three_columns_raise_combo_by_one(self):
+        # zmierzone w faza0: 3 kolumny bez wierszy dają +1 (20->21), nie +3
+        game = Game(seed=1)
+        game.combo = 20
+        game.board.grid = [[0] * 8] + [[1, 1, 1, 0, 0, 0, 0, 0] for _ in range(7)]
+        piece = [p for p in PIECE_POOL if p.name == "beam3-0"][0]
+        game.pieces = [piece, None, None]
+        game.round_placement = 2
+        game.board.place_piece(piece, 0, 0)
+        game.apply_placement(0)
+        self.assertEqual(game.last_lines_cleared, 3)
+        self.assertEqual(game.combo, 21)
 
 
 class TestComboMechanics(unittest.TestCase):
@@ -119,10 +144,17 @@ class TestComboMechanics(unittest.TestCase):
 
     def test_full_clear_bonus(self):
         # R-5: 300, nie 100.
+        self.game.combo = 6
         row_full_except(self.game, 7)
         gained = place_1x1(self.game, 7, 0)
-        # 1 komórka + combo 1 x B(1) + pusta plansza
-        self.assertEqual(gained, 1 + 10 + FULL_CLEAR_BONUS)
+        # 1 komórka + combo 7 x B(1) w jednostce 15 + pusta plansza
+        self.assertEqual(gained, 1 + 105 + FULL_CLEAR_BONUS)
+
+    def test_no_full_clear_bonus_at_low_combo(self):
+        # zmierzone w faza0: przy combo 1-5 pusta plansza nie daje bonusu
+        row_full_except(self.game, 7)
+        gained = place_1x1(self.game, 7, 0)
+        self.assertEqual(gained, 1 + 10)
 
 
 class TestScoreAccumulates(unittest.TestCase):
