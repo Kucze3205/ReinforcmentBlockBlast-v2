@@ -127,8 +127,11 @@ class BezpieczneOdtworzenieTest(Baza):
         self.assertIn("zepsuta", offline.odtworz_bezpiecznie(self.base, self.plik(WYJATEK))["blad"])
 
     def test_polityka_losowa_jest_odrzucona(self):
+        # random.randint dawał dwa różne wyniki tylko w ok. jednej trzeciej przebiegów (każda niezerowa paczka
+        # otwiera ten sam jedyny korzeń), więc test był losowy; pierwszy przebieg widzi, że drugi dopiero będzie
         w = offline.odtworz_bezpiecznie(self.base, self.plik(
-            "import random\ndef solve(q):\n    return [None] * random.randint(0, 4)\n"))
+            "import os\nSLAD = 'pierwszy.txt'\nPIERWSZY = not os.path.exists(SLAD)\n"
+            "open(SLAD, 'a').close()\ndef solve(q):\n    return [None] if PIERWSZY else []\n"))
         self.assertIn("nie jest deterministyczna", w["blad"])
 
     def test_petla_nieskonczona_to_blad_po_limicie(self):

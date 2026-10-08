@@ -35,7 +35,9 @@ zadanie() {
     echo "## Co wolno"
     echo
     echo "Zmieniasz tylko: $(echo $SCIEZKI)"
-    echo "Zmiana czegokolwiek innego unieważnia naprawę."
+    echo "Zmiana czegokolwiek innego unieważnia naprawę. Skrypty analizy zapisuj Write w \`.zadanie/\` i uruchamiaj"
+    echo "\`python3 .zadanie/x.py\`: Bash przyjmuje tylko pojedyncze \`git\`, \`python\`, \`python3\` i \`bash .zadanie/...\` (bez"
+    echo "\`cd\`, \`cat\`, heredoców i \$TMPDIR). Nowe pliki poza tą listą i \`.zadanie/\` są po sesji kasowane."
     echo
     echo "## Kryterium"
     echo
@@ -105,12 +107,20 @@ petla() {
       echo "### Iteracja $i: limit subskrypcji do $(cat "$WYNIK/limit-do"), naprawa wstrzymana" >> "$WYNIK/iteracje.md"
       break
     fi
-    cd "$WORK" && git add -A && git commit -q -m "Utrzymanie: niezatwierdzone zmiany iteracji $i" 2>/dev/null
+    cd "$WORK" || exit 1
+    # Nowe pliki robocze agenta (skrypty analizy: Bash z heredoc i $TMPDIR jest mu odmawiany, więc pisze je Write w katalogu
+    # roboczym) kasujemy zamiast unieważniać nimi naprawę: do gałęzi trafia tylko `git diff -- $SCIEZKI`, więc nie mają
+    # dokąd trafić, a iteracja 3 w #47 przeszła bramkę i mimo to przepadła przez tmp_an/ i tmp_*.py.
+    local smieci
+    smieci=$(git ls-files --others --exclude-standard | python3 "$KAL" dozwolone)
+    [ -n "$smieci" ] && echo "$smieci" | while IFS= read -r f; do rm -rf -- "$f"; done
+    git add -A && git commit -q -m "Utrzymanie: niezatwierdzone zmiany iteracji $i" 2>/dev/null
     local zle
     zle=$(git diff --name-only "$baza" HEAD | python3 "$KAL" dozwolone)
     sprawdz > "$WYNIK/sprawdzenie-$i.txt" 2>&1; local kod=$?
     {
       echo "### Iteracja $i"
+      [ -n "$smieci" ] && echo "Skasowane pliki robocze spoza dozwolonych: $(echo "$smieci" | tr '\n' ' ')"
       [ -n "$zle" ] && echo "Zmienione pliki spoza dozwolonych (cofnij je): $(echo "$zle" | tr '\n' ' ')"
       tail -8 "$WYNIK/sprawdzenie-$i.txt"
       echo

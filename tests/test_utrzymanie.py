@@ -102,6 +102,16 @@ class SkryptUtrzymaniaTest(unittest.TestCase):
         self.assertNotIn("policies.py", patch)
         self.assertIn("game.py", patch)
 
+    def test_nowe_pliki_robocze_sa_kasowane_i_nie_unieważniają_naprawy(self):
+        # #47: iteracja 3 przeszła bramkę, ale tmp_an/ i tmp_*.py odrzuciły naprawę
+        status, patch, iteracje = self.petla('mkdir tmp_an && echo x > tmp_an/an.py && echo x > tmp_fc.py && echo "# poprawka" >> game.py')
+        self.assertEqual(status, "przeszla")
+        self.assertIn("game.py", patch)
+        self.assertNotIn("tmp_", patch)
+        self.assertIn("Skasowane pliki robocze", iteracje)
+        self.assertFalse((self.work / "tmp_fc.py").exists())
+        self.assertFalse((self.work / "tmp_an" / "an.py").exists())
+
     def test_bramka_nie_do_przejscia_zostawia_nieudane_i_pusta_lacke(self):
         self.pomiar({"koniec": "awaria", "przyczyna": "adb"})
         status, patch, iteracje = self.petla("true")
