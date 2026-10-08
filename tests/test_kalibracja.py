@@ -230,6 +230,16 @@ class ZestawTest(unittest.TestCase):
             self.assertEqual(set(wpisy[0]) - {"move"}, {"n", "board", "tray", "score"})
             self.assertEqual(kal.logi(Path(d) / "a"), [wpisy])
 
+    def test_git_nie_zamienia_crlf_w_archiwum_zestawu(self):
+        """`.github/** text eol=lf` psuło .gz: bajty 0d0a w strumieniu schodziły do 0a przy `git add`."""
+        dane = b"a\r\nb\r\n" * 3
+        sciezka = ".github/evaluator/kalibracja/zestaw/x-1.jsonl.gz"
+
+        def hash_(*arg):
+            return subprocess.run(["git", "hash-object", *arg, "--stdin"], input=dane, capture_output=True,
+                                  cwd=ROOT, check=True).stdout
+        self.assertEqual(hash_("--path=" + sciezka), hash_("--no-filters"))
+
 
 class HashISciezkiTest(unittest.TestCase):
     def test_naprawa_mostu_zmienia_tylko_hash_mostu_a_symulatora_tylko_symulatora(self):

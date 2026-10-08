@@ -1,2 +1,3 @@
 .github/** text eol=lf
+.github/**/*.gz binary
 tools/*.sh text eol=lf
