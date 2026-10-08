@@ -10,16 +10,17 @@ import random
 
 from pieces import PIECE_POOL
 
-# Zliczenia klocków z pełnych tacek (3 klocki) w logach faza0 (10 partii, 1011 klocków).
+# Zliczenia klocków z pełnych tacek (3 klocki) w logach faza0 (10 partii, 1407 klocków).
 POSE_COUNTS = {
-    "1x1": 22, "beam2-0": 60, "beam2-1": 75, "beam3-0": 51, "beam3-1": 34,
-    "beam4-0": 40, "beam4-1": 68, "beam5-0": 28, "beam5-1": 26, "square2": 62,
-    "rect23-0": 36, "rect23-1": 49, "square3": 23, "corner3-0": 33,
-    "corner3-1": 15, "corner3-2": 8, "corner3-3": 9, "L-0": 8, "L-1": 14,
-    "L-2": 18, "L-3": 11, "L-4": 7, "L-5": 5, "L-6": 26, "L-7": 54,
-    "corner5-0": 6, "corner5-1": 12, "corner5-2": 3, "corner5-3": 15,
-    "diag2-0": 20, "diag2-1": 20, "diag3-0": 11, "diag3-1": 7, "S-0": 25,
-    "S-1": 11, "S-2": 18, "S-3": 10, "T-0": 5, "T-1": 16, "T-2": 5, "T-3": 45,
+    "1x1": 49, "beam2-0": 86, "beam2-1": 92, "beam3-0": 51, "beam3-1": 40,
+    "beam4-0": 48, "beam4-1": 105, "beam5-0": 32, "beam5-1": 23,
+    "square2": 107, "rect23-0": 53, "rect23-1": 58, "square3": 34,
+    "corner3-0": 28, "corner3-1": 14, "corner3-2": 17, "corner3-3": 14,
+    "L-0": 6, "L-1": 33, "L-2": 14, "L-3": 18, "L-4": 15, "L-5": 15,
+    "L-6": 28, "L-7": 93, "corner5-0": 12, "corner5-1": 7, "corner5-2": 5,
+    "corner5-3": 12, "diag2-0": 16, "diag2-1": 30, "diag3-0": 12,
+    "diag3-1": 4, "S-0": 51, "S-1": 20, "S-2": 23, "S-3": 17, "T-0": 19,
+    "T-1": 31, "T-2": 16, "T-3": 59,
 }
 WEIGHTS = [POSE_COUNTS[p.name] for p in PIECE_POOL]
 
