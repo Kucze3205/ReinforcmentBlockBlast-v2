@@ -12,9 +12,7 @@ from scoring import (
     FULL_CLEAR_BONUS,
     FULL_CLEAR_MIN_COMBO,
     FULL_CLEAR_MIN_SCORE,
-    SCORE_DECAY,
     clear_points,
-    decay_latch,
     placement_points,
 )
 
@@ -34,7 +32,6 @@ class Game:
         self.since_clear = 0         # postawienia bez czyszczenia od ostatniego czyszczenia
         self.combo_expiring = False  # licznik wygasł, combo czeka na jeden ruch łaski
         self.round_placement = 0
-        self.decay_active = None     # spadek bonusu: rozstrzygany raz, przy pierwszym przekroczeniu progu
         self.placements = 0          # przeżycie: liczba udanych postawień w partii
         self.last_lines_cleared = 0  # linie wyczyszczone ostatnim postawieniem
         self.pieces = self.generator.next_pieces()
@@ -102,9 +99,7 @@ class Game:
             self.combo_expiring = False
             self.since_clear = 0
             self.combo_counter = COMBO_COUNTER_BASE + remaining
-            if self.decay_active is None and self.score >= SCORE_DECAY[-1][0]:
-                self.decay_active = decay_latch(self.score, self.placements)
-            gained += clear_points(self.combo, lines, self.score, self.placements, self.decay_active)
+            gained += clear_points(self.combo, lines, self.score)
         elif self.combo_expiring or (self.combo_counter <= 1 and self.combo == 0):
             self.combo = 0
             self.combo_expiring = False
