@@ -74,3 +74,9 @@ def _immediate_gain(game, action):
         if not any(any(row) for row in board.grid):
             gain += FULL_CLEAR_BONUS
     return gain
+
+
+def build(weights=None):
+    """Punkt wejścia oceny: obiekt z reset(seed) i act(game, actions). Wagi niepotrzebne."""
+    from survival import SurvivalPolicy
+    return SurvivalPolicy()
