@@ -2,16 +2,25 @@
  "rodzic": "3.1",
  "rodzic_sha": "3574a5e1f87691e5eef9b5b3cbcf223078832494",
  "kolejnosc": 7,
- "sha": "3574a5e1f87691e5eef9b5b3cbcf223078832494",
- "stan": "sesja",
- "gist": "",
- "notatki": [],
+ "sha": "a1048e911912005e53b3c11e25e7f5c725d2a59f",
+ "stan": "ocena w toku",
+ "gist": "Baza 1.1 (beam, s_sym 0.562) + rerank liści ryzykiem następnej tacki",
+ "notatki": [
+  "Baza 1.1 (beam, s_sym 0.562) + rerank liści ryzykiem następnej tacki\n\nMechanizm: ocena jak w 1.1 (mobilność póz, dziury, przejścia, kara za klocek bez\nmiejsca), zamiast mojej nieskalibrowanej wersji z 3.1 (0.264). Nowość: po zakończeniu\ntacki 6 najlepszych liści wiązki jest przeranżowanych o -150*ryzyko, gdzie ryzyko to\nułamek 10 stałych próbnych tacek (rozkład generatora), których nie da się w całości\npostawić w żadnej kolejności (z czyszczeniem linii).\nDowód z historii: 1.1=0.562, 2.1=0.313, 3.1=0.264, 4.1=0.279; oceniana heurystyka 1.1\nwygrała, więc na niej buduję; lookahead na następną tackę nie był próbowany.\nSprawdzono tylko: brak wywrotek, legalne ruchy, ~4 ms/ruch. Wynik niezmierzony.\nRyzyko: waga 150 i 10 tacek dobrane ręcznie; próbki mogą być za małe.\n\nCo dalej: zrobione (ten commit). Następny krok: po ocenie dostroić wagę/liczbę tacek\nlub głębiej (2 tacki). Nie wracać do ewaluacji z 3.1.\n\nCo-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+ ],
  "koszt": {
-  "tury": 0,
-  "usd": 0.0,
-  "minuty": 0.0
+  "tury": 18,
+  "usd": 0.259,
+  "minuty": 2.0
  },
  "oczekiwanie_min": 0.0,
  "kontynuacje_tur": 0,
- "sesje": []
+ "sesje": [
+  {
+   "start": "2026-10-09T12:02:53Z",
+   "koniec": "2026-10-09T12:04:55Z",
+   "tury": 18,
+   "przyczyna": "terminal_reason=completed"
+  }
+ ]
 }
