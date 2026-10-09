@@ -2,16 +2,25 @@
  "rodzic": "korzen",
  "rodzic_sha": "caf8e7251570b57ad4a6ebb26f3b0b13e8326fcc",
  "kolejnosc": 3,
- "sha": "caf8e7251570b57ad4a6ebb26f3b0b13e8326fcc",
- "stan": "sesja",
- "gist": "",
- "notatki": [],
+ "sha": "3574a5e1f87691e5eef9b5b3cbcf223078832494",
+ "stan": "ocena w toku",
+ "gist": "Dodaj policies.build: polityka przeszukująca tackę wiązką pod przeżycie",
+ "notatki": [
+  "Dodaj policies.build: polityka przeszukująca tackę wiązką pod przeżycie\n\nMechanizm: w stanie początkowym brakowało policies.build (ocena dałaby 0).\nSearchPolicy (search_policy.py) na bitboardach przegląda wszystkie kolejności\ni pozycje 3 klocków (wiązka 12) i ocenia planszę mobilnością (ile z 41 póz się\nmieści), dziurami, przejściami i zajętością; punkty tylko jako remis.\nDowód z historii: INDEKS pusty, to pierwsza próba.\nRyzyko: wagi heurystyki nieskalibrowane, wynik niezmierzony; test sprawdza\ntylko legalność ruchów.\n\nCo dalej: zrobione (rewizja z tym komunikatem). Następny krok: po pomiarze\noceną dostroić wagi w _evaluate albo zwiększyć BEAM, patrząc na plansze\nprzegranych. Nie powtarzać bez tej analizy.\n\nCo-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+ ],
  "koszt": {
-  "tury": 0,
-  "usd": 0.0,
-  "minuty": 0.0
+  "tury": 18,
+  "usd": 0.2534,
+  "minuty": 2.2
  },
  "oczekiwanie_min": 0.0,
  "kontynuacje_tur": 0,
- "sesje": []
+ "sesje": [
+  {
+   "start": "2026-10-09T11:08:37Z",
+   "koniec": "2026-10-09T11:10:50Z",
+   "tury": 18,
+   "przyczyna": "terminal_reason=completed"
+  }
+ ]
 }
