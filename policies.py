@@ -59,7 +59,7 @@ class ModelPolicy:
 
 
 def build(weights=None):
-    """Punkt wejścia oceny: polityka przeżycia oparta na przeszukaniu tacki."""
+    """Punkt wejścia oceny. Polityka przeszukująca nie używa wag."""
     from search_policy import SearchPolicy
     return SearchPolicy()
 

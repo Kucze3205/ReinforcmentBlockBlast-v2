@@ -1,6 +1,7 @@
 """
-Polityka przeżycia: przeszukanie całej tacki (kolejność x miejsca) na bitboardzie
-z heurystyką izolowanych dziur / przejść / ruchliwości. Bez wag, deterministyczna.
+Polityka przeżycia: beam po kolejnościach i położeniach klocków z tacki,
+na bitboardach (bit = 8*y + x). Bez wag. Ocena planszy liczy, ile z 41 póz
+klocków jeszcze się mieści, karze izolowane dziury i poszarpanie.
 """
 from pieces import PIECE_POOL
 
@@ -8,67 +9,69 @@ _FULL = (1 << 64) - 1
 _ROWS = [0xFF << (8 * r) for r in range(8)]
 _COLS = [sum(1 << (8 * r + c) for r in range(8)) for c in range(8)]
 _LINES = _ROWS + _COLS
-
-_MASKS = {}
-
-
-def _masks(piece):
-    m = _MASKS.get(piece.index)
-    if m is None:
-        h, w = len(piece.shape), len(piece.shape[0])
-        base = 0
-        for dy, row in enumerate(piece.shape):
-            for dx, cell in enumerate(row):
-                if cell:
-                    base |= 1 << (8 * dy + dx)
-        m = _MASKS[piece.index] = [
-            (x, y, base << (8 * y + x)) for y in range(8 - h + 1) for x in range(8 - w + 1)
-        ]
-    return m
+_NOT_LEFT = _FULL & ~_COLS[0]
+_NOT_RIGHT = _FULL & ~_COLS[7]
 
 
-_PROBE = []
+def _piece_masks(piece):
+    """[(x, y, maska)] wszystkich położeń klocka na pustej planszy."""
+    h, w = len(piece.shape), len(piece.shape[0])
+    base = 0
+    for dy, row in enumerate(piece.shape):
+        for dx, cell in enumerate(row):
+            if cell:
+                base |= 1 << (8 * dy + dx)
+    return [(x, y, base << (8 * y + x))
+            for y in range(8 - h + 1) for x in range(8 - w + 1)]
 
 
-def _probe():
-    if not _PROBE:
-        _PROBE.extend([m for _, _, m in _masks(p)] for p in PIECE_POOL)
-    return _PROBE
+_MASKS = {p.index: _piece_masks(p) for p in PIECE_POOL}
+_PROBES = [[m for _, _, m in _MASKS[p.index]] for p in PIECE_POOL]
 
 
-def _clear(b):
-    full = 0
-    n = 0
-    for l in _LINES:
-        if b & l == l:
-            full |= l
-            n += 1
-    return b & ~full, n
+def _clear(board):
+    full = [m for m in _LINES if board & m == m]
+    for m in full:
+        board &= ~m
+    return board, len(full)
 
 
-def _evaluate(b):
-    left = (((b << 1) & _FULL) & ~_COLS[0]) | _COLS[0]
-    right = ((b >> 1) & ~_COLS[7]) | _COLS[7]
-    up = ((b << 8) & _FULL) | _ROWS[0]
-    down = (b >> 8) | _ROWS[7]
-    free = ~b & _FULL
-    c3 = (left & right & up) | (left & right & down) | (left & up & down) | (right & up & down)
-    c4 = left & right & up & down
-    n3 = bin(free & c3).count("1")
-    n4 = bin(free & c4).count("1")
-    trans = bin((b ^ (b >> 1)) & ~_COLS[7]).count("1") + bin((b ^ (b >> 8)) & ~_ROWS[7]).count("1")
-    mob = 0
-    for ms in _probe():
-        for m in ms:
-            if not b & m:
-                mob += 1
-                break
-    return 6.0 * mob - 8.0 * n3 - 12.0 * n4 - 1.5 * trans - 1.0 * bin(b).count("1")
+def _popcount(v):
+    return bin(v).count("1")
+
+
+def _eval(board):
+    empty = 64 - _popcount(board)
+    e = ~board & _FULL
+    reach = ((e << 1) & _NOT_LEFT) | ((e >> 1) & _NOT_RIGHT) | (e << 8) | (e >> 8)
+    isolated = _popcount(e & ~reach & _FULL)
+    trans = _popcount((board ^ (board >> 1)) & _NOT_RIGHT)
+    trans += _popcount((board ^ (board >> 8)) & (_FULL >> 8))
+    fit = 0
+    for masks in _PROBES:
+        c = 0
+        for m in masks:
+            if not board & m:
+                c += 1
+                if c == 3:
+                    break
+        fit += c
+    return 1.5 * fit + empty - 2.0 * isolated - trans
+
+
+def _score(board, lines, rest, pieces):
+    s = _eval(board) + 6.0 * lines
+    if board == 0:
+        s += 50
+    for i in rest:
+        if all(board & m for _, _, m in _MASKS[pieces[i].index]):
+            s -= 200
+    return s
 
 
 class SearchPolicy:
     name = "search"
-    BEAM = 10
+    BEAM = 40
 
     def reset(self, game_seed):
         pass
@@ -76,34 +79,33 @@ class SearchPolicy:
     def act(self, game, actions):
         board = 0
         for y, row in enumerate(game.board.grid):
-            for x, v in enumerate(row):
-                if v:
+            for x, c in enumerate(row):
+                if c:
                     board |= 1 << (8 * y + x)
-        idxs = [i for i, p in enumerate(game.pieces) if p is not None]
-        state = {"val": -1e18, "first": None}
-
-        def rec(b, rest, first, bonus):
-            if not rest:
-                v = _evaluate(b) + bonus
-                if v > state["val"]:
-                    state["val"], state["first"] = v, first
-                return
-            cands = []
-            for i in rest:
-                for x, y, m in _masks(game.pieces[i]):
-                    if b & m:
-                        continue
-                    nb, n = _clear(b | m)
-                    cands.append((_evaluate(nb) + 40.0 * n * n, i, x, y, nb, n))
-            if not cands:
-                v = _evaluate(b) + bonus - 500.0 * len(rest)
-                if v > state["val"]:
-                    state["val"], state["first"] = v, first
-                return
-            cands.sort(key=lambda c: -c[0])
-            for _, i, x, y, nb, n in cands[: self.BEAM]:
-                rec(nb, [j for j in rest if j != i], first or (i, x, y), bonus + 40.0 * n * n)
-
-        rec(board, idxs, None, 0.0)
-        first = state["first"]
-        return first if first in set(actions) else actions[0]
+        pieces = game.pieces
+        idxs = tuple(i for i, p in enumerate(pieces) if p is not None)
+        states = [(0.0, board, idxs, None, 0)]
+        for _ in range(len(idxs)):
+            nxt = []
+            for _, b, rem, first, lines in states:
+                for i in rem:
+                    rest = tuple(j for j in rem if j != i)
+                    for x, y, m in _MASKS[pieces[i].index]:
+                        if b & m:
+                            continue
+                        nb, n = _clear(b | m)
+                        nxt.append((_score(nb, lines + n, rest, pieces), nb, rest,
+                                    first or (i, x, y), lines + n))
+            if not nxt:
+                break
+            nxt.sort(key=lambda s: -s[0])
+            seen, states = set(), []
+            for s in nxt:
+                k = (s[1], s[2], s[3])
+                if k not in seen:
+                    seen.add(k)
+                    states.append(s)
+                    if len(states) == self.BEAM:
+                        break
+        first = states[0][3]
+        return first if first is not None else actions[0]
