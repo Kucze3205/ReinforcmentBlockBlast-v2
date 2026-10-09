@@ -95,7 +95,7 @@ def _next_tray(board):
 class SearchPolicy:
     name = "search"
     BEAM = 40
-    LOOK = 3
+    LOOK = 8
     LOOK_W = 1.0
 
     def reset(self, game_seed):
