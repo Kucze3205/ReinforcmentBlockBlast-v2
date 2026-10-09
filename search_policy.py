@@ -3,6 +3,8 @@ Polityka przeżycia: beam po kolejnościach i położeniach klocków z tacki,
 na bitboardach (bit = 8*y + x). Bez wag. Ocena planszy liczy, ile z 41 póz
 klocków jeszcze się mieści, karze izolowane dziury i poszarpanie.
 """
+from functools import lru_cache
+
 from pieces import PIECE_POOL, PIECE_TYPES
 
 _FULL = (1 << 64) - 1
@@ -65,6 +67,44 @@ def _eval(board):
     return 120.0 * fit + 12.0 * spots + empty - 2.0 * isolated - trans
 
 
+def _eval_fast(board):
+    """Tania ocena (jak w 2.2) do lookaheadu: ile póz się mieści, bez wag rozkładu."""
+    empty = 64 - _popcount(board)
+    e = ~board & _FULL
+    reach = ((e << 1) & _NOT_LEFT) | ((e >> 1) & _NOT_RIGHT) | (e << 8) | (e >> 8)
+    isolated = _popcount(e & ~reach & _FULL)
+    trans = _popcount((board ^ (board >> 1)) & _NOT_RIGHT)
+    trans += _popcount((board ^ (board >> 8)) & (_FULL >> 8))
+    fit = 0
+    for masks in _PROBES:
+        for m in masks:
+            if not board & m:
+                fit += 1
+                break
+    return 4.0 * fit + empty - 2.0 * isolated - trans
+
+
+_POSE_W = [(p, 1.0 / (len(PIECE_TYPES) * len(ts)))
+           for ts in PIECE_TYPES for p in ts]
+
+
+@lru_cache(maxsize=1 << 17)
+def _next_tray(board):
+    """Oczekiwana wartość po postawieniu jednego losowego klocka (rozkład generatora)."""
+    tot = 0.0
+    for pi, w in _POSE_W:
+        best = None
+        for _, _, m in _MASKS[pi]:
+            if board & m:
+                continue
+            nb, n = _clear(board | m)
+            v = _eval_fast(nb) + 6.0 * n
+            if best is None or v > best:
+                best = v
+        tot += w * (best if best is not None else -300.0)
+    return tot
+
+
 def _score(board, lines, rest, pieces):
     s = _eval(board) + 6.0 * lines
     if board == 0:
@@ -78,6 +118,8 @@ def _score(board, lines, rest, pieces):
 class SearchPolicy:
     name = "search"
     BEAM = 12
+    LOOK = 3
+    LOOK_W = 1.0
 
     def reset(self, game_seed):
         pass
@@ -113,5 +155,8 @@ class SearchPolicy:
                     states.append(s)
                     if len(states) == self.BEAM:
                         break
+        if not states[0][2]:
+            top = [(s[0] + self.LOOK_W * _next_tray(s[1]), s) for s in states[: self.LOOK]]
+            states = [max(top, key=lambda t: t[0])[1]]
         first = states[0][3]
         return first if first is not None else actions[0]
