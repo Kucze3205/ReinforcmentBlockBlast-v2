@@ -54,12 +54,10 @@ def combo_unit(combo):
 # Mnożnik bonusu za czyszczenie maleje z wynikiem partii (wynik sprzed ruchu). Progi z logów faza0, ruch po ruchu
 # (partie 2, 6, 7): 100% do 5991-6076, 80% od 6077 (6447 jeszcze 80%), 60% od 6607 (7123 jeszcze 60%), 40% od 7203
 # (8251 jeszcze 40%), 30% od 8409. Granice leżą w przedziałach (6447,6607], (7123,7203], (8251,8409].
-SCORE_DECAY = (
-    (8300, 30),
-    (7150, 40),
-    (6500, 60),
-    (6000, 80),
-)
+SCORE_DECAY = ()
+# Wyłączony: partie 1 i 4 zestawu (22,6 i 15,6 tys. pkt) mają bonus 100% przez całą partię; spadek 80/60/40/30% od ~6000
+# pkt wystąpił tylko w partii 10 (skórka różowa), więc zależy od czegoś poza wynikiem. Z spadkiem tempo apka/sym = 1,27
+# (poza ±15%), bez niego 0,88; partia 10 sama wychodzi wtedy 0,49.
 
 
 def score_decay(score):
