@@ -2,16 +2,25 @@
  "rodzic": "4.3",
  "rodzic_sha": "76063f062a808fba63abf821ffdaef04f05ecbfc",
  "kolejnosc": 16,
- "sha": "76063f062a808fba63abf821ffdaef04f05ecbfc",
- "stan": "sesja",
- "gist": "",
- "notatki": [],
+ "sha": "90d09296d377b17cb4b9fc8515e2b8d1f197829b",
+ "stan": "ocena w toku",
+ "gist": "Lookahead na następny klocek dla 8 najlepszych liści (LOOK 3->8) przy beam 40",
+ "notatki": [
+  "Lookahead na następny klocek dla 8 najlepszych liści (LOOK 3->8) przy beam 40\n\nMechanizm: kod 4.3 (0.825) z szerszym przeranżowaniem liści lookaheadem _next_tray.\nDowód z historii: 3.3 (0.885) to ta sama kombinacja z LOOK=6, 4.3 z LOOK=3 dało 0.825;\nzysk rośnie z LOOK, więc sprawdzam 8. Nie powtórka: nowa wartość parametru wzdłuż trendu.\nRyzyko: ok. 100-140 ms/ruch, 'za_wolna' było True już w 3.3; wyniku nie oceniam.\n\nCo dalej: zrobione - ten commit. Następny krok: po pomiarze LOOK_W lub lookahead na 2 klocki.\nNie powtarzać: LOOK<=6.\n\nCo-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+ ],
  "koszt": {
-  "tury": 0,
-  "usd": 0.0,
-  "minuty": 0.0
+  "tury": 17,
+  "usd": 0.1962,
+  "minuty": 3.2
  },
  "oczekiwanie_min": 0.0,
  "kontynuacje_tur": 0,
- "sesje": []
+ "sesje": [
+  {
+   "start": "2026-10-09T13:30:32Z",
+   "koniec": "2026-10-09T13:33:41Z",
+   "tury": 17,
+   "przyczyna": "terminal_reason=completed"
+  }
+ ]
 }
