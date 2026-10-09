@@ -2,16 +2,25 @@
  "rodzic": "4.2",
  "rodzic_sha": "5b0e8bb4593f60292eed84411ae5ffe7b02bdd76",
  "kolejnosc": 12,
- "sha": "5b0e8bb4593f60292eed84411ae5ffe7b02bdd76",
- "stan": "sesja",
- "gist": "",
- "notatki": [],
+ "sha": "76063f062a808fba63abf821ffdaef04f05ecbfc",
+ "stan": "ocena w toku",
+ "gist": "Beam 40 + fit-poz z 4.2 (0.725) połączone z lookaheadem na następny klocek z 2.2 (0.728)",
+ "notatki": [
+  "Beam 40 + fit-poz z 4.2 (0.725) połączone z lookaheadem na następny klocek z 2.2 (0.728)\n\nMechanizm: kod 4.2 plus _next_tray z 2.2: gdy tacka się kończy, 3 najlepsze stany wiązki\ndostają dodatek = oczekiwana najlepsza ocena po jednym losowym klocku (rozkład generatora).\nDowód z historii: 2.2 (0.728, beam 10, fit binarny) i 4.2 (0.725, beam 40, fit w pozach) dały\npodobny wynik różnymi drogami i nie były łączone. Nie powtórka: nowa kombinacja.\nRyzyko: ok. 50 ms/ruch (smoke 2x150 ruchów bez wywrotki), limit czasu niezmierzony; wyniku nie oceniam.\n\nCo dalej: zrobione - ten commit. Następny krok: po pomiarze, jeśli bez zysku, zbadać plansze\nprzegranych i spróbować głębszego lookaheadu (cała następna tacka). Nie powtarzać: samego BEAM.\n\nCo-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+ ],
  "koszt": {
-  "tury": 0,
-  "usd": 0.0,
-  "minuty": 0.0
+  "tury": 12,
+  "usd": 0.1581,
+  "minuty": 1.5
  },
  "oczekiwanie_min": 0.0,
  "kontynuacje_tur": 0,
- "sesje": []
+ "sesje": [
+  {
+   "start": "2026-10-09T12:29:57Z",
+   "koniec": "2026-10-09T12:31:27Z",
+   "tury": 12,
+   "przyczyna": "terminal_reason=completed"
+  }
+ ]
 }
