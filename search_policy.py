@@ -93,11 +93,45 @@ def _next_tray(board):
     return tot
 
 
+def _make_trays(n=12, seed=12345):
+    import random
+    rng = random.Random(seed)
+    return [tuple(rng.choice(rng.choice(PIECE_TYPES)) for _ in range(3))
+            for _ in range(n)]
+
+
+_TRAYS = _make_trays()
+
+
+def _survives(board, rem):
+    """Czy da się postawić wszystkie klocki z rem (indeksy póz) w jakiejś kolejności."""
+    if not rem:
+        return True
+    for k, pi in enumerate(rem):
+        if pi in rem[:k]:
+            continue
+        rest = rem[:k] + rem[k + 1:]
+        for _, _, m in _MASKS[pi]:
+            if board & m:
+                continue
+            nb, _ = _clear(board | m)
+            if _survives(nb, rest):
+                return True
+    return False
+
+
+@lru_cache(maxsize=1 << 16)
+def _tray_risk(board):
+    """Ułamek próbnych tacek (losowanych jak generator), których nie da się rozegrać w całości."""
+    return sum(not _survives(board, t) for t in _TRAYS) / len(_TRAYS)
+
+
 class SearchPolicy:
     name = "search"
     BEAM = 40
-    LOOK = 8
-    LOOK_W = 2.0
+    LOOK = 6
+    LOOK_W = 1.0
+    RISK_W = 300.0
 
     def reset(self, game_seed):
         pass
@@ -134,7 +168,7 @@ class SearchPolicy:
                     if len(states) == self.BEAM:
                         break
         if not states[0][2]:
-            top = [(s[0] + self.LOOK_W * _next_tray(s[1]), s) for s in states[: self.LOOK]]
+            top = [(s[0] + self.LOOK_W * _next_tray(s[1]) - self.RISK_W * _tray_risk(s[1]), s) for s in states[: self.LOOK]]
             states = [max(top, key=lambda t: t[0])[1]]
         first = states[0][3]
         return first if first is not None else actions[0]
