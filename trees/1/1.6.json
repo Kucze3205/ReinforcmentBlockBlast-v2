@@ -2,16 +2,25 @@
  "rodzic": "1.5",
  "rodzic_sha": "ef17954182a7e299eb86130a181ead23b8e8ebef",
  "kolejnosc": 21,
- "sha": "ef17954182a7e299eb86130a181ead23b8e8ebef",
- "stan": "sesja",
- "gist": "",
- "notatki": [],
+ "sha": "df64820cd84530c842344b28bc05750eb40a199f",
+ "stan": "ocena w toku",
+ "gist": "Powrót do kodu 3.3 (0.885, LOOK=6) + cecha oceny: premia za puste linie",
+ "notatki": [
+  "Powrót do kodu 3.3 (0.885, LOOK=6) + cecha oceny: premia za puste linie\n\nMechanizm: 1.5 (lookahead całej tacki, 0.828) i 1.4/3.4/4.5 (LOOK, kara; 0.86-0.88) nie pobiły 3.3 (0.885),\nwięc wracam do jego kodu i zmieniam ocenę planszy, a nie lookahead: +2.0 za każdy całkowicie pusty\nwiersz/kolumnę (miejsce na duże klocki). Dotąd nikt nie ruszał cech _eval po 4.2.\nNie mierzone; testy przechodzą poza tkinter. Ryzyko: waga 2.0 zgadnięta, wynik w granicach szumu (200 partii).\n\nCo dalej: zrobione - ten commit. Następny krok: po ocenie, jeśli gorzej niż 0.885, zdjąć cechę;\njeśli lepiej, stroić wagę. Nie powtarzać: lookahead całej tacki (1.5), samo LOOK/kara.\n\nCo-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+ ],
  "koszt": {
-  "tury": 0,
-  "usd": 0.0,
-  "minuty": 0.0
+  "tury": 13,
+  "usd": 0.223,
+  "minuty": 1.5
  },
  "oczekiwanie_min": 0.0,
  "kontynuacje_tur": 0,
- "sesje": []
+ "sesje": [
+  {
+   "start": "2026-10-09T15:44:03Z",
+   "koniec": "2026-10-09T15:45:33Z",
+   "tury": 13,
+   "przyczyna": "terminal_reason=completed"
+  }
+ ]
 }
