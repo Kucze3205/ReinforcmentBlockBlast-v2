@@ -3,7 +3,7 @@ Polityka przeżycia: beam po kolejnościach i położeniach klocków z tacki,
 na bitboardach (bit = 8*y + x). Bez wag. Ocena planszy liczy, ile z 41 póz
 klocków jeszcze się mieści, karze izolowane dziury i poszarpanie.
 """
-from pieces import PIECE_POOL
+from pieces import PIECE_POOL, PIECE_TYPES
 
 _FULL = (1 << 64) - 1
 _ROWS = [0xFF << (8 * r) for r in range(8)]
@@ -27,6 +27,11 @@ def _piece_masks(piece):
 
 _MASKS = {p.index: _piece_masks(p) for p in PIECE_POOL}
 _PROBES = [[m for _, _, m in _MASKS[p.index]] for p in PIECE_POOL]
+# prawdopodobieństwo wylosowania pozy: 1/15 na typ, potem 1/n na orientację
+_W = [0.0] * len(PIECE_POOL)
+for _t in PIECE_TYPES:
+    for _i in _t:
+        _W[_i] = 1.0 / (len(PIECE_TYPES) * len(_t))
 
 
 def _clear(board):
@@ -47,13 +52,17 @@ def _eval(board):
     isolated = _popcount(e & ~reach & _FULL)
     trans = _popcount((board ^ (board >> 1)) & _NOT_RIGHT)
     trans += _popcount((board ^ (board >> 8)) & (_FULL >> 8))
-    fit = 0
-    for masks in _PROBES:
+    fit = 0.0
+    spots = 0
+    for w, masks in zip(_W, _PROBES):
+        n = 0
         for m in masks:
             if not board & m:
-                fit += 1
-                break
-    return 4.0 * fit + empty - 2.0 * isolated - trans
+                n += 1
+        if n:
+            fit += w
+            spots += w * min(n, 6)
+    return 120.0 * fit + 12.0 * spots + empty - 2.0 * isolated - trans
 
 
 def _score(board, lines, rest, pieces):
@@ -68,7 +77,7 @@ def _score(board, lines, rest, pieces):
 
 class SearchPolicy:
     name = "search"
-    BEAM = 10
+    BEAM = 12
 
     def reset(self, game_seed):
         pass
