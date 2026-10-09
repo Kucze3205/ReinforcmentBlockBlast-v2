@@ -58,6 +58,12 @@ class ModelPolicy:
         return tuple(move)
 
 
+def build(weights=None):
+    """Punkt wejścia oceny. Polityka przeszukująca nie używa wag."""
+    from search_policy import SearchPolicy
+    return SearchPolicy()
+
+
 def _immediate_gain(game, action):
     """Punkty, które da to postawienie — wg skalibrowanego wzoru, bez zmiany stanu gry."""
     idx, x, y = action
