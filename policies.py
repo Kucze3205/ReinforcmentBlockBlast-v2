@@ -6,6 +6,7 @@ co polityka umie, a nie jak wypada w trakcie nauki (#8).
 """
 import random
 
+from beam_policy import build  # noqa: F401  (wejście oceny: policies.build)
 from board import Board
 from scoring import FULL_CLEAR_BONUS, clear_points, placement_points
 
