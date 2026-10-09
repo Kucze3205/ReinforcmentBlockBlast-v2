@@ -2,16 +2,26 @@
  "rodzic": "korzen",
  "rodzic_sha": "caf8e7251570b57ad4a6ebb26f3b0b13e8326fcc",
  "kolejnosc": 1,
- "sha": "caf8e7251570b57ad4a6ebb26f3b0b13e8326fcc",
- "stan": "sesja",
- "gist": "",
- "notatki": [],
+ "sha": "d0234bc16d174501cb6cc115cb142a477696a6ec",
+ "stan": "ocena w toku",
+ "gist": "Beam 40, 10 liści z fit-poz; lookahead ryzyka tacki dodany, ale wyłączony (RISK_W=0)",
+ "notatki": [
+  "Beam 40, 10 liści z fit-poz; lookahead ryzyka tacki dodany, ale wyłączony (RISK_W=0)\n\nMechanizm: wiązka 14 -> 40 (fit liczony na 10 liściach); _tray_ok/_trays dają karę za próbne\ntacki bez miejsca, domyślnie wyłączoną.\nDowód: test dymny tools/smoke_w.py (24 partie, limit 400 postawień; NIE ocena, duży szum):\nśr. postawień base 256 (16 przegranych), beam40 295 (11), beam100 238; filled 0/2, fit 0,\nisolated 8, trans 6 gorsze od base; ryzyko 20 -> 247 (bez poprawy), więc wyłączone.\nRyzyko: szum; ocena planszy wciąż słabsza niż w drzewie 1.\n\nCo dalej: zrobione - ten commit (i 5adf093). Następny krok: lepsza ocena planszy (nagroda za\nczyszczenie linii w kroku pośrednim, pojemność na duże klocki), lookahead następnego klocka.\nNie powtarzać: zmiany filled, trans 6, isolated 8, ryzyko 12 próbek z wagą 20-60.\n\nCo-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>",
+  "Dodaj policies.build: wiązka po tacce na bitboardach (beam_policy.py)\n\nMechanizm: DFS/wiązka (BEAM 14) po kolejności i miejscach klocków tacki, ocena planszy:\nprzejścia*3 + puste izolowane*4 + zajęte*0.5; na 6 liściach dodatkowo premia za liczbę póz,\nktóre jeszcze się mieszczą (1.5 each).\nDowód z historii: drzewo 1 (najlepsze 0.924) miało wiązkę + wagę trans 3 + ryzyko następnej\ntacki, ale jego kodu nie ma w tej gałęzi, więc odtwarzam rdzeń od zera.\nRyzyko: brak lookaheadu następnej tacki i niezmierzony wynik; sprawdzono tylko, że 2 partie\npo 300 postawień nie wywracają się (ok. 1 ms/ruch).\n\nCo dalej: zrobione - ten commit. Następny krok: lookahead ryzyka następnej tacki (próbkowane\ntacki, 2.5/2.7 z drzewa 1), strojenie W. Nie powtarzać: isolated<=1 lub >=4 przy trans 1.\n\nCo-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+ ],
  "koszt": {
-  "tury": 0,
-  "usd": 0.0,
-  "minuty": 0.0
+  "tury": 27,
+  "usd": 0.4555,
+  "minuty": 4.3
  },
  "oczekiwanie_min": 0.0,
  "kontynuacje_tur": 0,
- "sesje": []
+ "sesje": [
+  {
+   "start": "2026-10-09T20:18:54Z",
+   "koniec": "2026-10-09T20:23:14Z",
+   "tury": 27,
+   "przyczyna": "terminal_reason=completed"
+  }
+ ]
 }
