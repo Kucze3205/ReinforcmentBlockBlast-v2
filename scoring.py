@@ -51,10 +51,15 @@ def combo_unit(combo):
     return 20
 
 
-# Mnożnik bonusu za czyszczenie NIE zależy od wyniku partii: zmierzone na logach faza0, partie 2, 4 i 9 liczą 100% przy
-# 6000-60000 pkt (np. faza0-9 n85-n104 przy 6283-8806 pkt, faza0-2 n72-n73 przy 6387-6890). Dawne progi 80/60/40/30%
-# wynikały z rozjazdu combo, nie z punktacji; tylko dwa ruchy partii 10 (n108, n112 przy ~6100 pkt) dają 80%.
-SCORE_DECAY = ()
+# Mnożnik bonusu za czyszczenie maleje z wynikiem partii (wynik sprzed ruchu). Progi z logów faza0, ruch po ruchu
+# (partie 2, 6, 7): 100% do 5991-6076, 80% od 6077 (6447 jeszcze 80%), 60% od 6607 (7123 jeszcze 60%), 40% od 7203
+# (8251 jeszcze 40%), 30% od 8409. Granice leżą w przedziałach (6447,6607], (7123,7203], (8251,8409].
+SCORE_DECAY = (
+    (8300, 30),
+    (7150, 40),
+    (6500, 60),
+    (6000, 80),
+)
 
 
 def score_decay(score):
