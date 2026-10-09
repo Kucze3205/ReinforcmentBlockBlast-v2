@@ -2,16 +2,25 @@
  "rodzic": "korzen",
  "rodzic_sha": "caf8e7251570b57ad4a6ebb26f3b0b13e8326fcc",
  "kolejnosc": 4,
- "sha": "caf8e7251570b57ad4a6ebb26f3b0b13e8326fcc",
- "stan": "sesja",
- "gist": "",
- "notatki": [],
+ "sha": "cfc7f59077acc45b805d9dfd39eeddc296cc0302",
+ "stan": "ocena w toku",
+ "gist": "Dodaj policies.build: przeszukanie tacki na bitboardzie (SearchPolicy)",
+ "notatki": [
+  "Dodaj policies.build: przeszukanie tacki na bitboardzie (SearchPolicy)\n\nMechanizm: dla bieżącej tacki DFS po kolejności klocków i miejscach (beam 10 na poziom),\nocena planszy: ruchliwość (ile z 41 póz się mieści), kara za izolowane puste komórki,\nprzejścia, zajęte pola; premia za czyszczenie linii. Zwraca pierwszy ruch najlepszej sekwencji.\nDowód z historii: brak wcześniejszych prób; policies.build nie istniało (ocena dałaby 0).\nRyzyko: wagi heurystyki dobrane ręcznie, niezmierzone; smoke-run (2 partie) zakończył się\nprzegraną przy ok. 83 postawieniach, więc przeżycie nie jest wykazane. Nie mierzyłem wyniku.\n\nCo dalej: zrobione - build + SearchPolicy (ten commit). Następny krok: po pomiarze\nsprawdzić plansze przegranych i dostroić wagi/głębokość (np. wyszukiwanie z oczekiwaniem\npo następnej tacce). Nie powtarzać: samej zmiany beam bez analizy przegranych.\n\nCo-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+ ],
  "koszt": {
-  "tury": 0,
-  "usd": 0.0,
-  "minuty": 0.0
+  "tury": 16,
+  "usd": 0.2702,
+  "minuty": 2.0
  },
  "oczekiwanie_min": 0.0,
  "kontynuacje_tur": 0,
- "sesje": []
+ "sesje": [
+  {
+   "start": "2026-10-09T11:08:40Z",
+   "koniec": "2026-10-09T11:10:37Z",
+   "tury": 16,
+   "przyczyna": "terminal_reason=completed"
+  }
+ ]
 }
