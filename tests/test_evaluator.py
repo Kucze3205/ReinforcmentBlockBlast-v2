@@ -1,5 +1,4 @@
 """Testy ewaluatora: rozdania, hash, nakładka, ocena symulatorem, seria, s_v i bramka."""
-import importlib.util
 import json
 import os
 import re
@@ -11,9 +10,8 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-spec = importlib.util.spec_from_file_location("ocena", ROOT / ".github" / "evaluator" / "ocena.py")
-ocena = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(ocena)
+sys.path.append(str(ROOT / ".github" / "evaluator"))   # procesy puli `sym` (spawn) importują ocena po nazwie
+import ocena  # noqa: E402
 
 CFG = ocena.config()
 
@@ -95,6 +93,28 @@ class SymTest(unittest.TestCase):
                 self.assertTrue(0 < pelna["s_sym"] <= 1)
                 os.remove("%s/sym-1.json" % d)
                 self.assertTrue(ocena.zlicz_sym(d, small)["za_wolna"])
+        finally:
+            ocena.config = old_cfg
+            os.chdir(cwd)
+            sys.path[:] = path
+            os.environ.pop("DEALS_SALT", None)
+
+    def test_wynik_gry_nie_zalezy_od_podzialu_na_shardy(self):
+        # ocena przechodzi na inne shardy i liczbę procesów bez zmiany przezycie per rozdanie (#48)
+        small = dict(CFG, rozdania=8, cap=60)
+        old_cfg, ocena.config = ocena.config, lambda: small
+        cwd, path = os.getcwd(), list(sys.path)
+        try:
+            wyniki = []
+            for shardy in (1, 3):
+                with tempfile.TemporaryDirectory() as d:
+                    for s in range(shardy):
+                        os.environ["DEALS_SALT"] = "test"
+                        ocena.sym(str(ROOT), "1", s, shardy, "%s/sym-%d.json" % (d, s))
+                    wyniki.append(ocena.zlicz_sym(d, small))
+            self.assertEqual(len(wyniki[0]["przezycie"]), 8)
+            self.assertEqual(wyniki[0]["przezycie"], wyniki[1]["przezycie"])
+            self.assertEqual(wyniki[0]["s_sym"], wyniki[1]["s_sym"])
         finally:
             ocena.config = old_cfg
             os.chdir(cwd)

@@ -20,6 +20,7 @@ import re
 import shutil
 import sys
 import time
+from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -108,8 +109,27 @@ def graj(policy, seed, cap, game_cls):
         return game.placements, game.score, "%s: %s" % (type(exc).__name__, str(exc)[:200])
 
 
+_proces = {}
+
+
+def _start_procesu(node):
+    _proces["policy"] = build_policy(node)
+    from game import Game
+    _proces["game"] = Game
+
+
+def _gra_w_procesie(seed, cap, deadline):
+    """Gra w procesie puli; None, gdy limit shardu minął, zanim przyszła jej kolej."""
+    if time.monotonic() > deadline:
+        return None
+    return graj(_proces["policy"], seed, cap, _proces["game"])
+
+
 def sym(node, drzewo, shard, shardy, out):
+    """Gry shardu na wszystkich rdzeniach: każdy proces puli ma własną politykę i bierze następną
+    wolną grę. Gra zależy tylko od swojego ziarna, więc wynik per gra nie zależy od podziału."""
     out = Path(out).resolve()   # build_policy robi chdir do węzła; ścieżka względna z workflow szłaby obok
+    node = Path(node).resolve()
     cfg = config()
     seeds = rozdania(drzewo, cfg["rozdania"])
     os.environ.pop("DEALS_SALT", None)   # kod węzła nie czyta soli
@@ -118,19 +138,23 @@ def sym(node, drzewo, shard, shardy, out):
     rec = {"drzewo": drzewo, "hash_sym": hash_sym(deals_digest(seeds), cfg),
            "shard": shard, "gry": [], "blad": None}
     try:
-        policy = build_policy(node)
-        from game import Game
+        build_policy(node)
     except Exception as exc:
         rec["blad"] = "%s: %s" % (type(exc).__name__, str(exc)[:200])
         rec["gry"] = [{"i": i, "ruchy": 0, "punkty": 0} for i in mine]
     else:
         deadline = time.monotonic() + cfg["limit_shardu_s"]
-        for i in mine:
-            if time.monotonic() > deadline:
-                break
-            ruchy, punkty, blad = graj(policy, seeds[i], cfg["cap"], Game)
-            rec["gry"].append({"i": i, "ruchy": ruchy, "punkty": punkty})
-            rec["blad"] = rec["blad"] or blad
+        try:
+            with ProcessPoolExecutor(os.cpu_count(), initializer=_start_procesu, initargs=(node,)) as pool:
+                gry = {i: pool.submit(_gra_w_procesie, seeds[i], cfg["cap"], deadline) for i in mine}
+                for i, f in gry.items():
+                    if f.result() is None:
+                        continue
+                    ruchy, punkty, blad = f.result()
+                    rec["gry"].append({"i": i, "ruchy": ruchy, "punkty": punkty})
+                    rec["blad"] = rec["blad"] or blad
+        except Exception as exc:   # proces puli padł (np. kod węzła wyszedł z procesu): brakujące gry dają za_wolna
+            rec["blad"] = rec["blad"] or "%s: %s" % (type(exc).__name__, str(exc)[:200])
     rec["czas_s"] = round(time.monotonic() - t0, 1)
     Path(out).write_text(json.dumps(rec), encoding="utf-8")
 
