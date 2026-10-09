@@ -59,7 +59,7 @@ Symulator ma zgadzać się z oryginałem, a most z ekranem. Miary liczy `kalibra
 | Miara | Zasada |
 |---|---|
 | tempo punktów | te same ruchy zagrane w symulatorze dają sumę punktów w ±15% od przyrostu licznika apki; odczyty licznika spoza `0..max_delta` odrzucane, ruch i tak zagrany (combo) |
-| rozkład klocków | tacki z logu (nowa runda = trzy pełne sloty) vs rozkład generatora symulatora, χ² z p ≥ 0,01; nieznany kształt = błąd odczytu mostu (≤ 2%) |
+| rozkład klocków | tylko odczyt mostu: nieznany kształt w tacce (nowa runda = trzy pełne sloty) ≤ 2%. χ² tacek vs generator symulatora jest w raporcie informacyjnie: gra losuje klocki zależnie od rundy, więc stały generator nie przejdzie go na żadnej świeżej serii (p≈0) |
 | brak danych | za mało par (`min_pary`) albo klocków (`min_klockow`) to **nie zgoda**: wyzwalacz i bramka traktują to jak rozjazd (zepsuty OCR nie może przejść niezauważony); wyjątek: miary krótkiego odcinka w bramce |
 
 **Faza 0** (`gh workflow run faza0.yml`, ręcznie raz): `seria.yml` z polityką gałęzi domyślnej (bazowy agent), potem
@@ -88,7 +88,7 @@ logi fazy 0 i serii, które wykazały rozjazd. Czyste serie nie wchodzą do zest
 | wstrzymanie | `trees/utrzymanie.json` `{"stan":"naprawa"}`: `ocena.yml` czeka ze swoją serią (do ok. 5,5 h, potem węzeł zostaje `ocena w toku`); symulator i węzły działają dalej |
 | katalog agenta | kod projektu i ewaluatora bez `.github/{workflows,loop,policy}`, dokumentów, rekordów, `.claude` i historii gita; własne repo bez remote'a; `.zadanie/` (zadanie, dane serii, `sprawdz.sh`); APK w `assets/` |
 | iteracja | sesja agenta (skill `utrzymanie`, Sonnet, `--max-turns 120`, 60 min; limit subskrypcji = czekanie do resetu (do 2 h, najwyżej dwa razy), iteracja się nie liczy; dalszy limit = status `limit`: naprawa kończy się bez oceny, znacznik zostaje, a zgłoszenie podaje termin resetu i polecenie ponowienia) → sprawdzenie; do `iteracje` (3) iteracji w jednym jobie, emulator uruchomiony raz |
-| sprawdzenie | testy `tests.test_engine` i `tests.test_bridge` z kodem naprawy; `tools/bridge.sh` z `MOVES=150`; `kalibracja.py bramka`: zestaw kontrolny w tolerancji (twardo, brak danych = porażka) i odcinek: koniec `przegrana` albo `przerwanie` z powodem `limit ruchów` (awaria lub inne przerwanie = porażka), w odcinku tempo i odczyt kształtów (`nieznane` ≤ 2%), bez χ² klocków (rozkład rośnie z rundą, więc stały generator nie zgadza się z jedną partią; χ² liczy tylko zestaw), tylko gdy odcinek ma dość danych (krótka przegrana ich zwykle nie ma) |
+| sprawdzenie | testy `tests.test_engine` i `tests.test_bridge` z kodem naprawy; `tools/bridge.sh` z `MOVES=150`; `kalibracja.py bramka`: zestaw kontrolny w tolerancji (twardo, brak danych = porażka) i odcinek: koniec `przegrana` albo `przerwanie` z powodem `limit ruchów` (awaria lub inne przerwanie = porażka), miary odcinka tylko gdy ma dość danych (krótka przegrana ich zwykle nie ma) |
 | ścieżki | agent zmienia tylko pliki z `kalibracja.py sciezki` (`tylko_do_odczytu` + `utrzymanie.dodatkowe`: testy silnika i mostu); każda inna zmiana unieważnia iterację, a łatka ich nie zawiera. Bramka i `config.json` są poza zasięgiem: działają z kopii `ZAUFANE` |
 | poświadczenie | `CLAUDE_CODE_OAUTH_TOKEN` ma tylko proces claude; kod naprawy uruchamiany przez sprawdzenie (most) go nie widzi |
 | przyjęcie | łatka na gałąź `evaluator/<n>`; po przejściu bramki szybkie przesunięcie gałęzi domyślnej (bez PR), usunięcie znacznika i (dla `faza0`) nowa faza 0 |

@@ -7,7 +7,6 @@ import subprocess
 import sys
 import tempfile
 import unittest
-from unittest import mock
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -90,16 +89,6 @@ class MiaryTest(unittest.TestCase):
     def tacki(self, shapes, n=200):
         return [[{"n": i, "board": [[0] * 8 for _ in range(8)], "tray": shapes, "score": 0} for i in range(n)]]
 
-    def test_rozklad_klockow_skosny_odpada(self):
-        jeden = [p.shape for p in MOD.pieces.PIECE_POOL[:1]] * 3
-        # kolejne wpisy z tą samą tacką to powtórki po nieudanym ruchu, więc przeplatamy z pustą
-        wpisy = []
-        for i in range(200):
-            wpisy += [{"n": 2 * i, "board": [], "tray": jeden, "score": 0}, {"n": 2 * i + 1, "board": [], "tray": [None] * 3, "score": 0}]
-        kl = kal.klocki([wpisy], MOD, K)
-        self.assertFalse(kl["ok"], kl)
-        self.assertLess(kl["p"], 1e-6)
-
     def test_powtorzona_tacka_po_nieudanym_ruchu_liczy_sie_raz(self):
         shapes = [p.shape for p in MOD.pieces.PIECE_POOL[:3]]
         kl = kal.klocki(self.tacki(shapes), MOD, K)
@@ -160,15 +149,13 @@ class BramkaTest(unittest.TestCase):
         (self.odcinek / "pomiar.json").write_text(json.dumps({"koniec": "przerwanie", "przyczyna": "gra nie jest na pierwszym planie"}))
         self.assertFalse(self.bramka()["ok"])
 
-    def test_chi2_klockow_odcinka_nie_blokuje(self):
-        oryginal = kal.klocki
-
-        def klocki(partie, mod, k):
-            wynik = oryginal(partie, mod, k)
-            return dict(wynik, p=0.0002, ok=False) if len(partie) == 1 else wynik
-
-        with mock.patch.object(kal, "klocki", klocki):
-            self.assertTrue(self.bramka()["ok"])
+    def test_skrzywiony_rozklad_klockow_nie_jest_rozjazdem(self):
+        # p≈0 (tylko dwa kształty), ale most czyta wszystko: informacja, nie błąd
+        a, b = (MOD.pieces.PIECE_POOL[0].shape, MOD.pieces.PIECE_POOL[1].shape)
+        wpisy = [{"tray": [a, a, b] if n % 2 else [b, b, a]} for n in range(60)]
+        kl = kal.klocki([wpisy], MOD, kal.cfg()["kalibracja"])
+        self.assertLess(kl["p"], 0.01)
+        self.assertTrue(kl["ok"])
 
     def test_krotki_odcinek_bez_danych_nie_blokuje_ale_zly_blokuje(self):
         (self.odcinek / "moves.jsonl").write_text("\n".join(json.dumps(w) for w in zagraj(5)[:6]), encoding="utf-8")

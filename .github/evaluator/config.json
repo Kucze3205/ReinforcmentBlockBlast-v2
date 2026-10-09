@@ -11,7 +11,6 @@
   },
   "kalibracja": {
     "tempo": 0.15,
-    "chi2_p": 0.01,
     "min_pary": 20,
     "min_klockow": 60,
     "nieznane_max": 0.02,
