@@ -42,6 +42,9 @@ def _popcount(v):
     return bin(v).count("1")
 
 
+W = [1.5, 2.0, 3.0]  # wagi _eval: fit, isolated, trans
+
+
 def _eval(board):
     empty = 64 - _popcount(board)
     e = ~board & _FULL
@@ -58,7 +61,7 @@ def _eval(board):
                 if c == 3:
                     break
         fit += c
-    return 1.5 * fit + empty - 2.0 * isolated - trans
+    return W[0] * fit + empty - W[1] * isolated - W[2] * trans
 
 
 def _score(board, lines, rest, pieces):
