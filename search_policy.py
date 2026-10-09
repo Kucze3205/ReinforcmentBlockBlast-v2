@@ -3,7 +3,7 @@ Polityka przeżycia: beam po kolejnościach i położeniach klocków z tacki,
 na bitboardach (bit = 8*y + x). Bez wag. Ocena planszy liczy, ile z 41 póz
 klocków jeszcze się mieści, karze izolowane dziury i poszarpanie.
 """
-import random
+from functools import lru_cache
 
 from pieces import PIECE_POOL, PIECE_TYPES
 
@@ -42,6 +42,7 @@ def _popcount(v):
     return bin(v).count("1")
 
 
+@lru_cache(maxsize=1 << 18)
 def _eval(board):
     empty = 64 - _popcount(board)
     e = ~board & _FULL
@@ -51,11 +52,14 @@ def _eval(board):
     trans += _popcount((board ^ (board >> 8)) & (_FULL >> 8))
     fit = 0
     for masks in _PROBES:
+        c = 0
         for m in masks:
             if not board & m:
-                fit += 1
-                break
-    return 4.0 * fit + empty - 2.0 * isolated - trans
+                c += 1
+                if c == 3:
+                    break
+        fit += c
+    return 1.5 * fit + empty - 2.0 * isolated - trans
 
 
 def _score(board, lines, rest, pieces):
@@ -68,31 +72,32 @@ def _score(board, lines, rest, pieces):
     return s
 
 
-_rng = random.Random(12345)
-_TRAYS = [tuple(PIECE_POOL[_rng.choice(_rng.choice(PIECE_TYPES))].index for _ in range(3))
-          for _ in range(10)]
+_POSE_W = [(p, 1.0 / (len(PIECE_TYPES) * len(ts)))
+           for ts in PIECE_TYPES for p in ts]
 
 
-def _placeable(board, pids):
-    """Czy da się postawić wszystkie klocki w jakiejś kolejności (z czyszczeniem linii)."""
-    if not pids:
-        return True
-    for k, pid in enumerate(pids):
-        rest = pids[:k] + pids[k + 1:]
-        for _, _, m in _MASKS[pid]:
-            if not board & m and _placeable(_clear(board | m)[0], rest):
-                return True
-    return False
-
-
-def _risk(board):
-    """Ułamek próbnych tacek następnej rundy, których nie da się w całości postawić."""
-    return sum(not _placeable(board, t) for t in _TRAYS) / len(_TRAYS)
+@lru_cache(maxsize=1 << 17)
+def _next_tray(board):
+    """Oczekiwana wartość po postawieniu jednego losowego klocka (rozkład generatora)."""
+    tot = 0.0
+    for pi, w in _POSE_W:
+        best = None
+        for _, _, m in _MASKS[pi]:
+            if board & m:
+                continue
+            nb, n = _clear(board | m)
+            v = _eval(nb) + 6.0 * n
+            if best is None or v > best:
+                best = v
+        tot += w * (best if best is not None else -300.0)
+    return tot
 
 
 class SearchPolicy:
     name = "search"
-    BEAM = 10
+    BEAM = 40
+    LOOK = 6
+    LOOK_W = 1.0
 
     def reset(self, game_seed):
         pass
@@ -128,7 +133,8 @@ class SearchPolicy:
                     states.append(s)
                     if len(states) == self.BEAM:
                         break
-        if len(states) > 1 and not states[0][2]:
-            states = sorted(states[:6], key=lambda s: -(s[0] - 150.0 * _risk(s[1])))
+        if not states[0][2]:
+            top = [(s[0] + self.LOOK_W * _next_tray(s[1]), s) for s in states[: self.LOOK]]
+            states = [max(top, key=lambda t: t[0])[1]]
         first = states[0][3]
         return first if first is not None else actions[0]
