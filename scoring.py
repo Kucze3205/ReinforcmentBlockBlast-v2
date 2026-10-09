@@ -60,8 +60,21 @@ SCORE_DECAY = ((8409, 30), (7203, 40), (6607, 60), (6077, 80))
 DECAY_MAX_RATE = 75   # spadek tylko, gdy wynik / liczba postawień < 75; granica leży w przedziale (50, 106)
 
 
-def score_decay(score, placements=0):
-    if placements <= 0 or score >= DECAY_MAX_RATE * placements:
+# Przy zestawie kontrolnym (10 partii) spadek miała tylko część partii powyżej 6077 pkt i nie rozstrzyga o tym
+# bieżące tempo: partie z tempem 73 i 86 pkt/postawienie w chwili przekroczenia progu spadały, partie z tempem 46,
+# 66 i 142 nie. Dlatego tempo jest zatrzaskiwane raz, przy pierwszym przekroczeniu progu (patrz game.py), i mieści
+# się w oknie [DECAY_MIN_RATE, DECAY_MAX_RATE_LATCH).
+DECAY_MIN_RATE = 70
+DECAY_MAX_RATE_LATCH = 110
+
+
+def decay_latch(score, placements):
+    """Czy partia przekraczająca pierwszy próg spadku w tym tempie (pkt/postawienie) podlega spadkowi."""
+    return placements > 0 and DECAY_MIN_RATE * placements <= score < DECAY_MAX_RATE_LATCH * placements
+
+
+def score_decay(score, placements=0, active=None):
+    if active is False or (active is None and (placements <= 0 or score >= DECAY_MAX_RATE * placements)):
         return 100
     for threshold, percent in SCORE_DECAY:
         if score >= threshold:
@@ -69,6 +82,6 @@ def score_decay(score, placements=0):
     return 100
 
 
-def clear_points(combo, lines, score=0, placements=0):
+def clear_points(combo, lines, score=0, placements=0, active=None):
     """Punkty za czyszczenie: combo (po inkrementacji) mnoży bonus bazowy w jednostce combo_unit."""
-    return combo * line_bonus(lines) * combo_unit(combo) * score_decay(score, placements) // 1000
+    return combo * line_bonus(lines) * combo_unit(combo) * score_decay(score, placements, active) // 1000
