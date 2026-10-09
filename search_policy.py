@@ -42,10 +42,6 @@ def _popcount(v):
     return bin(v).count("1")
 
 
-# waga fit póz wg rozkładu generatora (typ równomiernie, poza równomiernie w typie), średnia 1
-_FIT_W = [41.0 / (len(PIECE_TYPES) * len(ts)) for ts in PIECE_TYPES for _ in ts]
-
-
 @lru_cache(maxsize=1 << 18)
 def _eval(board):
     empty = 64 - _popcount(board)
@@ -54,16 +50,16 @@ def _eval(board):
     isolated = _popcount(e & ~reach & _FULL)
     trans = _popcount((board ^ (board >> 1)) & _NOT_RIGHT)
     trans += _popcount((board ^ (board >> 8)) & (_FULL >> 8))
-    fit = 0.0
-    for masks, w in zip(_PROBES, _FIT_W):
+    fit = 0
+    for masks in _PROBES:
         c = 0
         for m in masks:
             if not board & m:
                 c += 1
                 if c == 3:
                     break
-        fit += w * c
-    return 1.5 * fit + empty - 2.0 * isolated - trans
+        fit += c
+    return 1.5 * fit + empty - 2.0 * isolated - 3.0 * trans
 
 
 def _score(board, lines, rest, pieces):
