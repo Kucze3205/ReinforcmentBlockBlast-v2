@@ -71,7 +71,8 @@ def _score(board, lines, rest, pieces):
     return s
 
 
-_POSE_W = [(p, 1.0 / (len(PIECE_TYPES) * len(ts)))
+DEAD = 800.0  # kara za pozę bez miejsca w następnej tacce (było 300)
+_POSE_W =[(p, 1.0 / (len(PIECE_TYPES) * len(ts)))
            for ts in PIECE_TYPES for p in ts]
 
 
@@ -88,14 +89,14 @@ def _next_tray(board):
             v = _eval(nb) + 6.0 * n
             if best is None or v > best:
                 best = v
-        tot += w * (best if best is not None else -300.0)
+        tot += w * (best if best is not None else -DEAD)
     return tot
 
 
 class SearchPolicy:
     name = "search"
     BEAM = 40
-    LOOK = 8
+    LOOK = 6
     LOOK_W = 1.0
 
     def reset(self, game_seed):
