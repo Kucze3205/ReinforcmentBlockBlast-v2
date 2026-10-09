@@ -2,16 +2,25 @@
  "rodzic": "2.5",
  "rodzic_sha": "6cc893bd83830ec2f29054787a6de40bbe19fec5",
  "kolejnosc": 22,
- "sha": "6cc893bd83830ec2f29054787a6de40bbe19fec5",
- "stan": "sesja",
- "gist": "",
- "notatki": [],
+ "sha": "178902d4a10ea9e27b55a2b52bc1c484d7ea82bd",
+ "stan": "ocena w toku",
+ "gist": "Fit póz ważony rozkładem generatora w _eval na bazie 2.5 (3.3 + ryzyko tacki)",
+ "notatki": [
+  "Fit póz ważony rozkładem generatora w _eval na bazie 2.5 (3.3 + ryzyko tacki)\n\nMechanizm: w _eval fit (liczba położeń do 3) każdej z 41 póz mnożony przez 41/(15*liczba póz typu), czyli prawdopodobieństwo pozy w generatorze (średnia waga 1). Poza jedyna w typie (np. 3x3) liczy się ok. 2.7x więcej niż jedna z 8 póz typu.\nDowód: zgon na seedzie 15 po 19 ruchach to taca trzech klocków 3x3 bez miejsca; stary fit traktował wszystkie 41 póz równo. Ważenie rozkładem pomogło w 1.2 (0.562->0.595), ale nigdy nie było łączone z fit-liczbą z 3.3/2.5. Nie powtórka strojenia LOOK/LOOK_W/BEAM/RISK_W.\nRyzyko: zmienia się skala _eval, więc wagi lookaheadu i ryzyka mogą być nieoptymalne.\nPomiar własny (NIE ocena): 16 lokalnych seedów, cap 400 ruchów, średnia przeżycia 0.713 -> 0.757, mała próba, szum duży. Ocena niezmierzona.\n\nCo dalej: zrobione - ten commit. Następny krok: po ocenie porównać z 0.885 (3.3) i 0.875 (2.5); jeśli lepiej, stroić wagę fit (1.5) i próg 3; jeśli gorzej, wrócić do 3.3. Nie powtarzać: strojenia LOOK, LOOK_W, BEAM.\n\nCo-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+ ],
  "koszt": {
-  "tury": 0,
-  "usd": 0.0,
-  "minuty": 0.0
+  "tury": 25,
+  "usd": 0.3425,
+  "minuty": 7.9
  },
  "oczekiwanie_min": 0.0,
  "kontynuacje_tur": 0,
- "sesje": []
+ "sesje": [
+  {
+   "start": "2026-10-09T15:44:07Z",
+   "koniec": "2026-10-09T15:51:58Z",
+   "tury": 25,
+   "przyczyna": "terminal_reason=completed"
+  }
+ ]
 }
