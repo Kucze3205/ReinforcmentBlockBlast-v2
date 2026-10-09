@@ -2,16 +2,26 @@
  "rodzic": "korzen",
  "rodzic_sha": "caf8e7251570b57ad4a6ebb26f3b0b13e8326fcc",
  "kolejnosc": 3,
- "sha": "caf8e7251570b57ad4a6ebb26f3b0b13e8326fcc",
- "stan": "sesja",
- "gist": "",
- "notatki": [],
+ "sha": "6c1ae687f803b436c65aaa9adf5b140e5d84296f",
+ "stan": "ocena w toku",
+ "gist": "Wiązka 40 -> 100 w SurvivalPolicy, smoke.py z parametrami",
+ "notatki": [
+  "Wiązka 40 -> 100 w SurvivalPolicy, smoke.py z parametrami\n\nDowód (lokalny wskaźnik, 48 partii, limit 500 postawień, nie ocena): BEAM 40/80/300 ->\nprzegranych 27/23/22 (śr. 337/368/384); ok. 15 ms/postawienie przy 80, 35 przy 300.\nBEAM 100 jako kompromis czasu. trans=5 i risk=1000 bez poprawy (27, 28 przegranych);\nFINAL=40 + SAMPLES=30 nie pomogło (27), a było 10x wolniejsze.\n\nCo dalej: zrobione (ten commit). Następny krok: po ocenie zbadać plansze przegranych\n(zgony tacek nie do ułożenia), ewentualnie lookahead 1 klocka. Nie powtarzać: FINAL/SAMPLES w górę, trans>3.\n\nCo-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>",
+  "Dodaj policies.build: polityka przeżycia (wiązka po tacce, bitboardy)\n\nMechanizm: na tej gałęzi nie było policies.build (kod z drzewa 1 nie przeszedł do\nstanu początkowego), więc ocena dawała 0. survival.SurvivalPolicy: wiązka 40 po\nkolejnościach i położeniach klocków tacki, ocena = puste - 4*izolowane - 3*przejścia\n+ 2*linie; 8 najlepszych liści dostaje fit póz (waga 1.5) i karę 300 za ułamek z 12\npróbnych tacek, których nie da się rozegrać (DFS). Odtworzone wg notatek drzewa 1\n(najlepsze 0.924: trans=3, fit 1.5, ryzyko tacki). Wynik niezmierzony; 8 partii x 300\npostawień bez wywrotki, ok. 8 ms/postawienie.\n\nCo dalej: zrobione (ten commit). Następny krok: po ocenie stroić wagi W (trans 4-6),\nsprawdzić czas. Nie powtarzać: NN z agent.py, premii kwadratowej za linie.\n\nCo-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+ ],
  "koszt": {
-  "tury": 0,
-  "usd": 0.0,
-  "minuty": 0.0
+  "tury": 38,
+  "usd": 0.5708,
+  "minuty": 12.2
  },
  "oczekiwanie_min": 0.0,
  "kontynuacje_tur": 0,
- "sesje": []
+ "sesje": [
+  {
+   "start": "2026-10-09T20:18:56Z",
+   "koniec": "2026-10-09T20:31:07Z",
+   "tury": 38,
+   "przyczyna": "terminal_reason=completed"
+  }
+ ]
 }
