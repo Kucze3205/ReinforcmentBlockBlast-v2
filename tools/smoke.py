@@ -4,7 +4,18 @@ import time
 from multiprocessing import Pool
 
 sys.path.insert(0, '.')
+import json
+import os
+
 import policies
+import survival
+
+for kv in (sys.argv[3].split(",") if len(sys.argv) > 3 else []):
+    k, v = kv.split("=")
+    if k in ("BEAM", "FINAL", "SAMPLES"):
+        setattr(survival, k, int(v))
+    else:
+        survival.W[k] = float(v)
 from game import Game
 
 CAP = int(sys.argv[1]) if len(sys.argv) > 1 else 500
