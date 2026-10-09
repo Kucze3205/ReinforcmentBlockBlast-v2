@@ -242,12 +242,19 @@ def fmt(x):
     return "—" if x is None else "%.3f" % x
 
 
+def czas_oceny(o):
+    """Czas oceny symulatorem; `za wolna` = ocena przekroczyła limit i nie dostaje serii (#48)."""
+    czas = o.get("czas_sym_min")
+    wolna = (latest(o.get("sym") or {}) or {}).get("za_wolna")
+    return ("—" if czas is None else "%.1f" % czas) + (" za wolna" if wolna else "")
+
+
 def table(recs):
-    lines = ["| węzeł | rodzic | s_sym | s_emu | gist |", "|---|---|---|---|---|"]
+    lines = ["| węzeł | rodzic | s_sym | s_emu | ocena [min] | gist |", "|---|---|---|---|---|---|"]
     for name, r in sorted(recs.items(), key=lambda kv: kv[1]["kolejnosc"]):
         o = r.get("oceny") or {}
-        lines.append("| %s | %s | %s | %s | %s |" % (name, r["rodzic"], fmt(latest(o.get("s_sym") or {})),
-                                                     fmt(o.get("s_emu")), r["gist"].replace("|", "/")))
+        lines.append("| %s | %s | %s | %s | %s | %s |" % (name, r["rodzic"], fmt(latest(o.get("s_sym") or {})),
+                                                          fmt(o.get("s_emu")), czas_oceny(o), r["gist"].replace("|", "/")))
     return lines
 
 

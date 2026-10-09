@@ -32,7 +32,7 @@ tylko przyjdzie faktura.
 ## Ewaluator (`ocena.yml`, `seria.yml`, `.github/evaluator/`)
 
 Ocena węzła: `gh workflow run ocena.yml -f wezel=<sha> -f drzewo=<t> -f id=<nazwa>`.
-Przebieg: 10 shardów symulatora (300 rozdań, cap 2000) → przy 0 przegranych seria 10 partii na
+Przebieg: 10 shardów symulatora (300 rozdań, cap 2000; w shardzie gry idą na wszystkich rdzeniach jobu, wynik gry zależy tylko od jej rozdania) → przy 0 przegranych seria 10 partii na
 emulatorze (`seria.yml`; serie paczki idą równolegle, nadmiar partii czeka w kolejce jobów GitHuba, bez `concurrency`, bo ta anuluje oczekujące uruchomienia) → artefakt `ocena-<id>` z `ocena.json`.
 Pierwszy krok pętli, `AUTOPILOT`, sprawdza `ocena.yml`; `seria.yml` wywołana z niego już go nie sprawdza.
 
