@@ -1,4 +1,6 @@
 """Polityka przeżycia: wiązka po tacce na bitboardach (bit = y*8 + x)."""
+import random
+
 from pieces import PIECE_POOL
 
 _FULL = (1 << 64) - 1
@@ -8,8 +10,8 @@ _NOT_COL0 = _FULL & ~_COLS[0]
 _NOT_COL7 = _FULL & ~_COLS[7]
 _LOW56 = (1 << 56) - 1
 W = {"trans": 3.0, "isolated": 4.0, "filled": 0.5, "fit": 1.5}
-BEAM = 14
-FIT_LEAVES = 6
+BEAM = 40
+FIT_LEAVES = 10
 
 _POSE_MASKS = []  # dla pozy: lista (x, y, maska)
 for _p in PIECE_POOL:
@@ -59,11 +61,35 @@ def _fit(b):
     return n
 
 
+def _tray_ok(b, poses):
+    """Czy da się postawić wszystkie klocki tacki w jakiejś kolejności."""
+    if not poses:
+        return True
+    for k, pose in enumerate(poses):
+        left = poses[:k] + poses[k + 1:]
+        for _, _, m in _POSE_MASKS[pose]:
+            if not b & m and _tray_ok(_clear(b | m), left):
+                return True
+    return False
+
+
+_TYPES = [[p.index for p in PIECE_POOL if p.type_index == t] for t in range(15)]
+RISK_TRAYS = 12
+RISK_W = 0.0
+
+
+def _trays(rng):
+    out = []
+    for _ in range(RISK_TRAYS):
+        out.append(tuple(rng.choice(rng.choice(_TYPES)) for _ in range(3)))
+    return out
+
+
 class BeamPolicy:
     name = "beam"
 
     def reset(self, game_seed):
-        pass
+        self._rng = random.Random(f"risk:{game_seed}")
 
     def act(self, game, actions):
         board = 0
@@ -93,9 +119,11 @@ class BeamPolicy:
         if not done:
             return actions[0]
         done.sort(key=lambda s: _cheap(s[0]))
+        trays = _trays(self._rng)
         best, bs = None, None
         for b, first in done[:FIT_LEAVES]:
-            s = _cheap(b) - W["fit"] * _fit(b)
+            bad = sum(not _tray_ok(b, t) for t in trays)
+            s = _cheap(b) - W["fit"] * _fit(b) + RISK_W * bad
             if bs is None or s < bs:
                 best, bs = first, s
         return best if best in actions else actions[0]
