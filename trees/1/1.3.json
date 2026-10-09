@@ -2,16 +2,25 @@
  "rodzic": "1.2",
  "rodzic_sha": "269417caac15f60a04e7e86aae4df470e1c25909",
  "kolejnosc": 9,
- "sha": "269417caac15f60a04e7e86aae4df470e1c25909",
- "stan": "sesja",
- "gist": "",
- "notatki": [],
+ "sha": "563aeb6b65dc289a045bfe60b973876478be6ee6",
+ "stan": "ocena w toku",
+ "gist": "Ocena 1.2 (rozkład generatora) + lookahead następnej tacki z 2.2",
+ "notatki": [
+  "Ocena 1.2 (rozkład generatora) + lookahead następnej tacki z 2.2\n\nMechanizm: połączenie dwóch zmierzonych elementów. Beam 12 z oceną 1.2 (s_sym 0.595),\na dla LOOK=3 najlepszych końcowych stanów dodana oczekiwana wartość jednego losowego klocka\nnastępnej tacki (_next_tray z 2.2, s_sym 0.728; +0.17 względem bazy 1.1). Lookahead używa\ntaniej oceny z 2.2 (_eval_fast), by nie liczyć 41 póz x wszystkie położenia.\nDowód: 2.2 (0.728) > 4.2 (0.725) > 3.2 > 1.2 (0.595); nikt nie łączył lookaheadu z oceną 1.2.\nNie mierzone; sprawdzono tylko 2x150 ruchów bez wywrotki (~0.02-0.03 s/ruch).\nRyzyko: ocena 1.2 mogła być słabsza niż 1.1 w jakiejś części; wtedy kombinacja nie pomoże.\n\nCo dalej: zrobione - ten commit. Następnie: jeśli <0.728, wrócić do oceny 2.2 i zwiększyć\nLOOK/LOOK_W albo lookahead na parę klocków. Nie powtarzać: beam >=40.\n\nCo-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+ ],
  "koszt": {
-  "tury": 0,
-  "usd": 0.0,
-  "minuty": 0.0
+  "tury": 15,
+  "usd": 0.1966,
+  "minuty": 1.3
  },
  "oczekiwanie_min": 0.0,
  "kontynuacje_tur": 0,
- "sesje": []
+ "sesje": [
+  {
+   "start": "2026-10-09T12:29:54Z",
+   "koniec": "2026-10-09T12:31:14Z",
+   "tury": 15,
+   "przyczyna": "terminal_reason=completed"
+  }
+ ]
 }
