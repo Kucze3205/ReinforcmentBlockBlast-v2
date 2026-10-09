@@ -1,164 +1,137 @@
 """
-Polityka przeszukująca całą tackę (bitboard, 64-bitowa plansza).
-
-Dla klocków z tacki sprawdza kolejności i pozycje (z cięciem do najlepszych
-kandydatów na każdym poziomie), ocenia planszę heurystyką przeżycia
-(dziury, przejścia, zajętość, ruchliwość) i zwraca pierwszy ruch najlepszej
-sekwencji. Punkty tylko rozstrzygają remis.
+Polityka przeżycia: beam po kolejnościach i położeniach klocków z tacki,
+na bitboardach (bit = 8*y + x). Bez wag. Ocena planszy liczy, ile z 41 póz
+klocków jeszcze się mieści, karze izolowane dziury i poszarpanie.
 """
 from functools import lru_cache
-from itertools import permutations
 
-from board import Board
-from pieces import PIECE_POOL
+from pieces import PIECE_POOL, PIECE_TYPES
 
-W = 8
-FULL = (1 << 64) - 1
-ROW_MASKS = [sum(1 << (r * W + c) for c in range(W)) for r in range(W)]
-COL_MASKS = [sum(1 << (r * W + c) for r in range(W)) for c in range(W)]
-
-_PLACEMENTS = {}
+_FULL = (1 << 64) - 1
+_ROWS = [0xFF << (8 * r) for r in range(8)]
+_COLS = [sum(1 << (8 * r + c) for r in range(8)) for c in range(8)]
+_LINES = _ROWS + _COLS
+_NOT_LEFT = _FULL & ~_COLS[0]
+_NOT_RIGHT = _FULL & ~_COLS[7]
 
 
-def placements(idx):
-    """Lista (x, y, maska) dla klocka o danym indeksie w puli."""
-    if idx not in _PLACEMENTS:
-        piece = PIECE_POOL[idx]
-        h, w = len(piece.shape), len(piece.shape[0])
-        out = []
-        for y in range(W - h + 1):
-            for x in range(W - w + 1):
-                m = 0
-                for dy, row in enumerate(piece.shape):
-                    for dx, cell in enumerate(row):
-                        if cell:
-                            m |= 1 << ((y + dy) * W + x + dx)
-                out.append((x, y, m))
-        _PLACEMENTS[idx] = out
-    return _PLACEMENTS[idx]
+def _piece_masks(piece):
+    """[(x, y, maska)] wszystkich położeń klocka na pustej planszy."""
+    h, w = len(piece.shape), len(piece.shape[0])
+    base = 0
+    for dy, row in enumerate(piece.shape):
+        for dx, cell in enumerate(row):
+            if cell:
+                base |= 1 << (8 * dy + dx)
+    return [(x, y, base << (8 * y + x))
+            for y in range(8 - h + 1) for x in range(8 - w + 1)]
 
 
-def apply(board, mask):
-    """Stawia maskę i czyści linie. Zwraca (plansza, liczba linii)."""
-    b = board | mask
-    clear = 0
-    lines = 0
-    for rm in ROW_MASKS:
-        if b & rm == rm:
-            clear |= rm
-            lines += 1
-    for cm in COL_MASKS:
-        if b & cm == cm:
-            clear |= cm
-            lines += 1
-    return b & ~clear & FULL, lines
+_MASKS = {p.index: _piece_masks(p) for p in PIECE_POOL}
+_PROBES = [[m for _, _, m in _MASKS[p.index]] for p in PIECE_POOL]
 
 
-def _popcount(x):
-    return bin(x).count("1")
+def _clear(board):
+    full = [m for m in _LINES if board & m == m]
+    for m in full:
+        board &= ~m
+    return board, len(full)
 
 
-@lru_cache(maxsize=1 << 20)
-def evaluate(b):
-    """Im wyżej tym lepiej. Heurystyka przeżycia."""
-    if b == 0:
-        return 1000.0
-    occ = _popcount(b)
-    score = -1.0 * occ
-    # komórki puste otoczone (dziury): liczba sąsiadów zajętych/ścian
-    empty = ~b & FULL
-    holes = 0
-    for i in range(64):
-        if empty >> i & 1:
-            r, c = divmod(i, W)
-            n = 0
-            n += 1 if r == 0 or b >> (i - W) & 1 else 0
-            n += 1 if r == W - 1 or b >> (i + W) & 1 else 0
-            n += 1 if c == 0 or b >> (i - 1) & 1 else 0
-            n += 1 if c == W - 1 or b >> (i + 1) & 1 else 0
-            if n == 4:
-                holes += 3
-            elif n == 3:
-                holes += 1
-    score -= 4.0 * holes
-    # przejścia wierszy i kolumn (poszarpanie)
-    trans = 0
-    for r in range(W):
-        row = (b >> (r * W)) & 0xFF
-        trans += _popcount((row ^ (row >> 1)) & 0x7F)
-    for c in range(W):
-        col = 0
-        for r in range(W):
-            col |= (b >> (r * W + c) & 1) << r
-        trans += _popcount((col ^ (col >> 1)) & 0x7F)
-    score -= 0.7 * trans
-    # linie prawie pełne to potencjał
-    for m in ROW_MASKS + COL_MASKS:
-        k = _popcount(b & m)
-        if k >= 6:
-            score += (k - 5) * 1.5
-    return score
+def _popcount(v):
+    return bin(v).count("1")
+
+
+@lru_cache(maxsize=1 << 18)
+def _eval(board):
+    empty = 64 - _popcount(board)
+    e = ~board & _FULL
+    reach = ((e << 1) & _NOT_LEFT) | ((e >> 1) & _NOT_RIGHT) | (e << 8) | (e >> 8)
+    isolated = _popcount(e & ~reach & _FULL)
+    trans = _popcount((board ^ (board >> 1)) & _NOT_RIGHT)
+    trans += _popcount((board ^ (board >> 8)) & (_FULL >> 8))
+    fit = 0
+    for masks in _PROBES:
+        for m in masks:
+            if not board & m:
+                fit += 1
+                break
+    return 4.0 * fit + empty - 2.0 * isolated - trans
+
+
+def _score(board, lines, rest, pieces):
+    s = _eval(board) + 6.0 * lines
+    if board == 0:
+        s += 50
+    for i in rest:
+        if all(board & m for _, _, m in _MASKS[pieces[i].index]):
+            s -= 200
+    return s
+
+
+_POSE_W = [(p, 1.0 / (len(PIECE_TYPES) * len(ts)))
+           for ts in PIECE_TYPES for p in ts]
+
+
+@lru_cache(maxsize=1 << 17)
+def _next_tray(board):
+    """Oczekiwana wartość po postawieniu jednego losowego klocka (rozkład generatora)."""
+    tot = 0.0
+    for pi, w in _POSE_W:
+        best = None
+        for _, _, m in _MASKS[pi]:
+            if board & m:
+                continue
+            nb, n = _clear(board | m)
+            v = _eval(nb) + 6.0 * n
+            if best is None or v > best:
+                best = v
+        tot += w * (best if best is not None else -300.0)
+    return tot
 
 
 class SearchPolicy:
     name = "search"
-    BEAM = 8
+    BEAM = 10
+    LOOK = 3
+    LOOK_W = 1.0
 
     def reset(self, game_seed):
         pass
 
-    def _chain(self, board, key, depth):
-        if depth == len(key):
-            return evaluate(board)
-        cands = []
-        for x, y, m in placements(key[depth]):
-            if board & m:
-                continue
-            nb, lines = apply(board, m)
-            cands.append((evaluate(nb) + 6.0 * lines, nb))
-        if not cands:
-            return None
-        cands.sort(key=lambda t: -t[0])
-        best = None
-        for _, nb in cands[: self.BEAM]:
-            v = self._chain(nb, key, depth + 1)
-            if v is not None and (best is None or v > best):
-                best = v
-        return best
-
     def act(self, game, actions):
         board = 0
-        for r, row in enumerate(game.board.grid):
-            for c, v in enumerate(row):
-                if v:
-                    board |= 1 << (r * W + c)
-        idxs = [(i, p.index) for i, p in enumerate(game.pieces) if p is not None]
-        best_action, best_val = actions[0], None
-        for action in actions:
-            i, x, y = action
-            pidx = game.pieces[i].index
-            mask = next(m for px, py, m in placements(pidx) if px == x and py == y)
-            nb, lines = apply(board, mask)
-            rest = tuple(p for j, p in idxs if j != i)
-            if rest:
-                val = self._search_rest(nb, rest)
-                if val is None:
-                    val = -1e6  # ruch kończy partię
-            else:
-                val = evaluate(nb)
-            val += 6.0 * lines + 0.01 * (game.pieces[i] and sum(map(sum, game.pieces[i].shape)))
-            if best_val is None or val > best_val:
-                best_action, best_val = action, val
-        return best_action
-
-    def _search_rest(self, board, rest):
-        best = None
-        seen = set()
-        for order in permutations(rest):
-            if order in seen:
-                continue
-            seen.add(order)
-            v = self._chain(board, order, 0)
-            if v is not None and (best is None or v > best):
-                best = v
-        return best
+        for y, row in enumerate(game.board.grid):
+            for x, c in enumerate(row):
+                if c:
+                    board |= 1 << (8 * y + x)
+        pieces = game.pieces
+        idxs = tuple(i for i, p in enumerate(pieces) if p is not None)
+        states = [(0.0, board, idxs, None, 0)]
+        for _ in range(len(idxs)):
+            nxt = []
+            for _, b, rem, first, lines in states:
+                for i in rem:
+                    rest = tuple(j for j in rem if j != i)
+                    for x, y, m in _MASKS[pieces[i].index]:
+                        if b & m:
+                            continue
+                        nb, n = _clear(b | m)
+                        nxt.append((_score(nb, lines + n, rest, pieces), nb, rest,
+                                    first or (i, x, y), lines + n))
+            if not nxt:
+                break
+            nxt.sort(key=lambda s: -s[0])
+            seen, states = set(), []
+            for s in nxt:
+                k = (s[1], s[2], s[3])
+                if k not in seen:
+                    seen.add(k)
+                    states.append(s)
+                    if len(states) == self.BEAM:
+                        break
+        if not states[0][2]:
+            top = [(s[0] + self.LOOK_W * _next_tray(s[1]), s) for s in states[: self.LOOK]]
+            states = [max(top, key=lambda t: t[0])[1]]
+        first = states[0][3]
+        return first if first is not None else actions[0]
