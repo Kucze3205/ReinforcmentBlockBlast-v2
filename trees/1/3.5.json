@@ -2,16 +2,25 @@
  "rodzic": "3.4",
  "rodzic_sha": "3c18e343261f0a69b7e933c049b114c5cda3edcf",
  "kolejnosc": 19,
- "sha": "3c18e343261f0a69b7e933c049b114c5cda3edcf",
- "stan": "sesja",
- "gist": "",
- "notatki": [],
+ "sha": "f0bb36dfaba81fa2be22e4f50400a718fd5de42e",
+ "stan": "ocena w toku",
+ "gist": "Odrzucony szkic: lookahead 2 klocków (_look2) — bez zmian w kodzie",
+ "notatki": [
+  "Odrzucony szkic: lookahead 2 klocków (_look2) — bez zmian w kodzie\n\nMechanizm próbowany: rerank liści wartością dwóch klocków w przód (2 najlepsze położenia\n+ 0.5*tańsza próbka następnego), LOOK 10->3..5 dla kosztu.\nDowód odrzucenia (lokalny test działania, nie ocena): na seedach 1 i 2 Game(seed) kod 3.4 gra\n146 i 194 ruchów, szkic 65 i 32; ruch 0.16-0.56 s vs szybszy 3.4 (3.4 i tak oznaczone za_wolna).\nKod zostaje jak w 3.4 (0.883; 3.3 = 0.885 — różnice w szumie, kara 1000 i LOOK 10 nie pomogły).\n\nCo dalej: zrobione (ten commit, brak zmiany kodu). Następny krok: przyspieszenie (za_wolna) —\nnp. BEAM 40->20 przy zachowaniu fit/lookahead — albo nauka wag _eval (fit, isolated, trans)\nna zapisanych planszach przegranych; nie powtarzać lookahead 2 klocków w tej formie.\n\nCo-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+ ],
  "koszt": {
-  "tury": 0,
-  "usd": 0.0,
-  "minuty": 0.0
+  "tury": 20,
+  "usd": 0.3067,
+  "minuty": 7.7
  },
  "oczekiwanie_min": 0.0,
  "kontynuacje_tur": 0,
- "sesje": []
+ "sesje": [
+  {
+   "start": "2026-10-09T14:34:09Z",
+   "koniec": "2026-10-09T14:41:49Z",
+   "tury": 20,
+   "przyczyna": "terminal_reason=completed"
+  }
+ ]
 }
