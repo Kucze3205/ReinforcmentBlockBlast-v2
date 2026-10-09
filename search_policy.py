@@ -3,6 +3,7 @@ Polityka przeżycia: beam po kolejnościach i położeniach klocków z tacki,
 na bitboardach (bit = 8*y + x). Bez wag. Ocena planszy liczy, ile z 41 póz
 klocków jeszcze się mieści, karze izolowane dziury i poszarpanie.
 """
+import random
 from functools import lru_cache
 
 from pieces import PIECE_POOL, PIECE_TYPES
@@ -93,11 +94,34 @@ def _next_tray(board):
     return tot
 
 
+def _tray_value(board, tray, beam=3):
+    """Ocena po zagraniu całej tacki 3 klocków (mały beam); brak miejsca = -300 za klocek."""
+    states = [(0.0, board, tuple(range(len(tray))))]
+    for _ in range(len(tray)):
+        nxt = {}
+        for _, b, rem in states:
+            for i in rem:
+                rest = tuple(j for j in rem if j != i)
+                for _, _, m in _MASKS[tray[i].index]:
+                    if b & m:
+                        continue
+                    nb, n = _clear(b | m)
+                    k = (nb, rest)
+                    if k not in nxt:
+                        nxt[k] = (_eval(nb) + 6.0 * n, nb, rest)
+        if not nxt:
+            return -300.0 * len(rem) + max(t[0] for t in states)
+        states = sorted(nxt.values(), key=lambda t: -t[0])[:beam]
+    return states[0][0]
+
+
 class SearchPolicy:
     name = "search"
     BEAM = 40
-    LOOK = 10
+    LOOK = 5
     LOOK_W = 1.0
+    TRAYS = 3
+    TRAY_W = 1.0
 
     def reset(self, game_seed):
         pass
@@ -134,7 +158,13 @@ class SearchPolicy:
                     if len(states) == self.BEAM:
                         break
         if not states[0][2]:
-            top = [(s[0] + self.LOOK_W * _next_tray(s[1]), s) for s in states[: self.LOOK]]
+            rng = random.Random(board)
+            trays = [[PIECE_POOL[rng.choice(rng.choice(PIECE_TYPES))] for _ in range(3)]
+                     for _ in range(self.TRAYS)]
+            top = []
+            for s in states[: self.LOOK]:
+                tv = sum(_tray_value(s[1], t) for t in trays) / len(trays)
+                top.append((s[0] + self.LOOK_W * _next_tray(s[1]) + self.TRAY_W * tv, s))
             states = [max(top, key=lambda t: t[0])[1]]
         first = states[0][3]
         return first if first is not None else actions[0]
