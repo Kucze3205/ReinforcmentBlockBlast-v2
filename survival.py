@@ -46,29 +46,58 @@ def clear(b):
     return b & ~full, full != 0
 
 
+ERODE = []  # (przesunięcia komórek, maska poprawnych kotwic) dla każdej pozy
+for _p, _ms in zip(PIECE_POOL, PLACE):
+    _cells = [8 * dy + dx for dy, row in enumerate(_p.shape) for dx, c in enumerate(row) if c]
+    _anch = sum(1 << (8 * y + x) for _, x, y in _ms)
+    ERODE.append((_cells, _anch))
+
+
 def fits(b):
+    """Ile póz (z 41) ma jakiekolwiek miejsce na planszy."""
+    e = ~b & FULL
     n = 0
-    for ms in PLACE:
-        for m, _, _ in ms:
-            if not b & m:
-                n += 1
+    for cells, anch in ERODE:
+        r = anch
+        for c in cells:
+            r &= e >> c
+            if not r:
                 break
+        if r:
+            n += 1
     return n
 
 
 NOT_LAST_COL = 0x7F7F7F7F7F7F7F7F
 
 
-@lru_cache(maxsize=1 << 20)
-def evaluate(b):
+def cheap(b):
     # przejścia pusty/pełny w wierszach i kolumnach, ściana liczy się jako pełna
     trans = pop(((b ^ (b >> 1)) & NOT_LAST_COL)) + pop(b & EDGE_L) + pop(b & EDGE_R) \
         + pop((b ^ (b >> 8)) & (FULL >> 8)) + pop(b & ROWS[0]) + pop(b & ROWS[7])
     around = (((b << 1) & FULL) | EDGE_L) & ((b >> 1) | EDGE_R) \
         & (((b << 8) & FULL) | ROWS[0]) & ((b >> 8) | ROWS[7])
     iso = pop(~b & around & FULL)
-    return -(W["trans"] * trans + W["isolated"] * iso + W["fill"] * pop(b)) \
-        + W["fit"] * fits(b)
+    return -(W["trans"] * trans + W["isolated"] * iso + W["fill"] * pop(b))
+
+
+@lru_cache(maxsize=1 << 20)
+def evaluate(b):
+    return cheap(b) + W["fit"] * fits(b)
+
+
+def playable(b, poses):
+    """Czy da się ułożyć wszystkie klocki w jakiejś kolejności (DFS, bez oceny)."""
+    if not poses:
+        return True
+    for i, k in enumerate(poses):
+        if i and poses[i] in poses[:i]:
+            continue
+        rest = poses[:i] + poses[i + 1:]
+        for m, _, _ in PLACE[k]:
+            if not b & m and playable(clear(b | m)[0], rest):
+                return True
+    return False
 
 
 def search(b, poses, beam=BEAM):
@@ -93,7 +122,7 @@ def search(b, poses, beam=BEAM):
                 break
             states = list(nxt.values())
             if len(states) > beam:
-                states.sort(key=lambda s: evaluate(s[0]) + s[1], reverse=True)
+                states.sort(key=lambda s: cheap(s[0]) + s[1], reverse=True)
                 states = states[:beam]
         for sb, bonus, first in states:
             v = evaluate(sb) + bonus
@@ -112,7 +141,7 @@ class SurvivalPolicy:
         dead = 0
         for _ in range(SAMPLES):
             tray = [self.rng.randrange(NPOSE) for _ in range(3)]
-            if not search(b, tray, beam=4):
+            if not playable(b, tuple(tray)):
                 dead += 1
         return dead / SAMPLES
 
