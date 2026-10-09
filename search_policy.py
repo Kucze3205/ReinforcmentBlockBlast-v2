@@ -3,7 +3,9 @@ Polityka przeżycia: beam po kolejnościach i położeniach klocków z tacki,
 na bitboardach (bit = 8*y + x). Bez wag. Ocena planszy liczy, ile z 41 póz
 klocków jeszcze się mieści, karze izolowane dziury i poszarpanie.
 """
-from pieces import PIECE_POOL
+from functools import lru_cache
+
+from pieces import PIECE_POOL, PIECE_TYPES
 
 _FULL = (1 << 64) - 1
 _ROWS = [0xFF << (8 * r) for r in range(8)]
@@ -69,9 +71,32 @@ def _score(board, lines, rest, pieces):
     return s
 
 
+_POSE_W = [(p, 1.0 / (len(PIECE_TYPES) * len(ts)))
+           for ts in PIECE_TYPES for p in ts]
+
+
+@lru_cache(maxsize=1 << 17)
+def _next_tray(board):
+    """Oczekiwana wartość po postawieniu jednego losowego klocka (rozkład generatora)."""
+    tot = 0.0
+    for pi, w in _POSE_W:
+        best = None
+        for _, _, m in _MASKS[pi]:
+            if board & m:
+                continue
+            nb, n = _clear(board | m)
+            v = _eval(nb) + 6.0 * n
+            if best is None or v > best:
+                best = v
+        tot += w * (best if best is not None else -300.0)
+    return tot
+
+
 class SearchPolicy:
     name = "search"
     BEAM = 40
+    LOOK = 3
+    LOOK_W = 1.0
 
     def reset(self, game_seed):
         pass
@@ -107,5 +132,8 @@ class SearchPolicy:
                     states.append(s)
                     if len(states) == self.BEAM:
                         break
+        if not states[0][2]:
+            top = [(s[0] + self.LOOK_W * _next_tray(s[1]), s) for s in states[: self.LOOK]]
+            states = [max(top, key=lambda t: t[0])[1]]
         first = states[0][3]
         return first if first is not None else actions[0]
