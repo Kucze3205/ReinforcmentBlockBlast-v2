@@ -52,11 +52,14 @@ def _eval(board):
     trans += _popcount((board ^ (board >> 8)) & (_FULL >> 8))
     fit = 0
     for masks in _PROBES:
+        c = 0
         for m in masks:
             if not board & m:
-                fit += 1
-                break
-    return 4.0 * fit + empty - 2.0 * isolated - trans
+                c += 1
+                if c == 3:
+                    break
+        fit += c
+    return 1.5 * fit + empty - 2.0 * isolated - trans
 
 
 def _score(board, lines, rest, pieces):
@@ -92,8 +95,8 @@ def _next_tray(board):
 
 class SearchPolicy:
     name = "search"
-    BEAM = 10
-    LOOK = 3
+    BEAM = 20
+    LOOK = 5
     LOOK_W = 1.0
 
     def reset(self, game_seed):
