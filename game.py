@@ -11,6 +11,7 @@ from scoring import (
     COMBO_COUNTER_BASE,
     FULL_CLEAR_BONUS,
     FULL_CLEAR_MIN_COMBO,
+    FULL_CLEAR_MIN_SCORE,
     clear_points,
     placement_points,
 )
@@ -120,7 +121,7 @@ class Game:
 
         # zmierzone: apka nie daje bonusu przy combo <= 5 (faza0-10 n2, faza0-5 n10, odcinek n5: combo 2, 5, 2),
         # daje przy combo >= 7 (faza0-6 n15, faza0-4 n24, faza0-10 n61 i n64)
-        if self.combo >= FULL_CLEAR_MIN_COMBO and not any(any(row) for row in self.board.grid):
+        if self.combo >= FULL_CLEAR_MIN_COMBO and self.score >= FULL_CLEAR_MIN_SCORE and not any(any(row) for row in self.board.grid):
             gained += FULL_CLEAR_BONUS
 
         if self.round_placement == 3:

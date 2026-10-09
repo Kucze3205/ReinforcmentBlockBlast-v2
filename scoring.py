@@ -14,8 +14,12 @@ Nic z tego nie jest pomiarem na oryginale — patrz docs/calibration-assumptions
 
 FULL_CLEAR_BONUS = 300
 
-# Najniższe combo, przy którym apka wypłaca bonus za pustą planszę (zmierzone w logach: combo 1 i 2 nie, 4 tak).
-FULL_CLEAR_MIN_COMBO = 4
+# Najniższe combo, przy którym apka wypłaca bonus za pustą planszę (zmierzone w logach: combo 1, 2, 5 i 6 nie, 7+ tak).
+FULL_CLEAR_MIN_COMBO = 1
+
+# Najniższy wynik partii, od którego apka wypłaca bonus za pustą planszę (zmierzone: bez bonusu przy 148, 182, 301 pkt,
+# z bonusem przy 482 pkt, combo 4; combo nie rozstrzyga). Próg znany z dokładnością do przedziału 301-482.
+FULL_CLEAR_MIN_SCORE = 400
 
 # Ile postawień bez czyszczenia przeżywa combo, gdy tacka jest pusta/1/2 klocki.
 COMBO_COUNTER_BASE = 3
@@ -47,10 +51,10 @@ def combo_unit(combo):
     return 20
 
 
-# Mnożnik bonusu za czyszczenie maleje z łącznym wynikiem partii (procenty). Zmierzone na logach faza0
-# (partie 1, 8, 9): 100% do ~6000 pkt, 80% od ~6000, 60% od ~6600, 40% od ~7000, 30% od ~8500;
-# dalej 30% aż do 997 tys. pkt. Progi znane z dokładnością do przedziału między sąsiednimi ruchami.
-SCORE_DECAY = ((8500, 30), (7000, 40), (6600, 60), (6000, 80))
+# Mnożnik bonusu za czyszczenie NIE zależy od wyniku partii: zmierzone na logach faza0, partie 2, 4 i 9 liczą 100% przy
+# 6000-60000 pkt (np. faza0-9 n85-n104 przy 6283-8806 pkt, faza0-2 n72-n73 przy 6387-6890). Dawne progi 80/60/40/30%
+# wynikały z rozjazdu combo, nie z punktacji; tylko dwa ruchy partii 10 (n108, n112 przy ~6100 pkt) dają 80%.
+SCORE_DECAY = ()
 
 
 def score_decay(score):

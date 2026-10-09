@@ -77,13 +77,11 @@ class TestMeasuredComboLadder(unittest.TestCase):
         self.assertEqual(clear_points(13, 2), 520)
         self.assertEqual(clear_points(17, 3), 2040)
 
-    def test_bonus_decays_with_game_score(self):
-        # faza0: partia 1 n72 (352), n79 (200), n89 (186); partia 8 n118 (176) i n130 (12)
-        self.assertEqual(clear_points(22, 1, 6301), 352)
-        self.assertEqual(clear_points(11, 1, 6156), 176)
-        self.assertEqual(clear_points(25, 1, 7247), 200)
-        self.assertEqual(clear_points(31, 1, 8613), 186)
-        self.assertEqual(clear_points(4, 1, 9709), 12)
+    def test_bonus_does_not_decay_with_game_score(self):
+        # faza0: partia 9 n85 (460 przy 6283 pkt) i n104 (135 przy 8806 pkt), partia 2 n72 (500 przy 6387 pkt)
+        self.assertEqual(clear_points(23, 1, 6283), 460)
+        self.assertEqual(clear_points(9, 1, 8806), 135)
+        self.assertEqual(clear_points(25, 1, 6387), 500)
 
     def test_combo_grows_by_lines_cleared(self):
         game = Game(seed=1)
@@ -153,6 +151,7 @@ class TestComboMechanics(unittest.TestCase):
     def test_full_clear_bonus(self):
         # R-5: 300, nie 100.
         self.game.combo = 6
+        self.game.score = 1000
         row_full_except(self.game, 7)
         gained = place_1x1(self.game, 7, 0)
         # 1 komórka + combo 7 x B(1) w jednostce 15 + pusta plansza
@@ -163,6 +162,14 @@ class TestComboMechanics(unittest.TestCase):
         row_full_except(self.game, 7)
         gained = place_1x1(self.game, 7, 0)
         self.assertEqual(gained, 1 + 10)
+
+    def test_no_full_clear_bonus_at_low_score(self):
+        # zmierzone w faza0: faza0-8 n12 (combo 6, 301 pkt) bez bonusu, n23 (combo 4, 482 pkt) z bonusem
+        self.game.combo = 5
+        self.game.score = 301
+        row_full_except(self.game, 7)
+        gained = place_1x1(self.game, 7, 0)
+        self.assertEqual(gained, 1 + 90)
 
 
 class TestScoreAccumulates(unittest.TestCase):
