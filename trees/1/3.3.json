@@ -2,16 +2,25 @@
  "rodzic": "3.2",
  "rodzic_sha": "a1048e911912005e53b3c11e25e7f5c725d2a59f",
  "kolejnosc": 11,
- "sha": "a1048e911912005e53b3c11e25e7f5c725d2a59f",
- "stan": "sesja",
- "gist": "",
- "notatki": [],
+ "sha": "b255b81220e26092b26b5f8ffd0d287136ca0f93",
+ "stan": "ocena w toku",
+ "gist": "Kombinacja 2.2 (lookahead następnej tacki) + 4.2 (beam 40, fit do 3 póz)",
+ "notatki": [
+  "Kombinacja 2.2 (lookahead następnej tacki) + 4.2 (beam 40, fit do 3 póz)\n\nMechanizm: baza to kod 2.2 (s_sym 0.728: beam 1.1 + oczekiwana wartość losowego klocka następnej tacki, _next_tray). Z 4.2 (0.725, bez lookahead): BEAM 10->40 i fit jako liczba póz (do 3) z wagą 1.5. LOOK 3->6, bo szerszy beam daje więcej liści do przeranżowania.\nDowód z historii: 2.2 i 4.2 to niezależne ulepszenia tej samej bazy 1.1 (0.562) i nie były łączone; rerank ryzykiem z 3.2 (0.605) był słabszy od lookahead 2.2.\nSprawdzono tylko: testy przechodzą (poza tkinter), 150 ruchów bez wywrotek, ok. 80 ms/ruch. Wynik niezmierzony. Ryzyko: skala _eval zmieniła się (fit 1.5), więc LOOK_W=1 może być nieoptymalne; gra do 2000 ruchów ok. 160 s.\nCo dalej: zrobione (ten commit). Następny krok: po ocenie dostroić LOOK/LOOK_W albo lookahead na 2 klocki. Nie wracać do rerank ryzykiem z 3.2.\n\nCo-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+ ],
  "koszt": {
-  "tury": 0,
-  "usd": 0.0,
-  "minuty": 0.0
+  "tury": 18,
+  "usd": 0.2446,
+  "minuty": 2.1
  },
  "oczekiwanie_min": 0.0,
  "kontynuacje_tur": 0,
- "sesje": []
+ "sesje": [
+  {
+   "start": "2026-10-09T12:29:56Z",
+   "koniec": "2026-10-09T12:32:01Z",
+   "tury": 18,
+   "przyczyna": "terminal_reason=completed"
+  }
+ ]
 }
