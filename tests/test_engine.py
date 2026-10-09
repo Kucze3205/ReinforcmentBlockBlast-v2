@@ -78,15 +78,17 @@ class TestMeasuredComboLadder(unittest.TestCase):
         self.assertEqual(clear_points(17, 3), 2040)
 
     def test_bonus_decays_with_game_score(self):
-        # faza0 (zestaw kontrolny), ruch po ruchu: bonus 100% do 22,6 tys. pkt w partiach 1 i 4 (apka: 1 linia =
-        # 20*combo przy combo >= 11, np. combo 36-41 przy 17-21 tys.); tylko jedna z trzech partii powyżej 6000 pkt
-        # (partia 10, skórka różowa) spadała do 80/60/40/30%, co nie wynika z wyniku, więc symulator tego nie modeluje.
-        self.assertEqual(clear_points(23, 1, 5599), 460)
-        self.assertEqual(clear_points(9, 1, 6206), 135)
+        # faza0, ruch po ruchu: w partiach o niskim tempie (45-50 pkt na postawienie: partie 4, 8, 10) bonus spada do
+        # 80/60/40/30% od 6077/6607/7203/8409 pkt; w partiach szybkich (partie 3 i 9, 106-112 pkt na postawienie)
+        # zostaje 100% do 29 tys. pkt (apka: 1 linia = 20*combo przy combo >= 11).
+        self.assertEqual(clear_points(23, 1, 5599, 120), 460)
+        self.assertEqual(clear_points(9, 1, 6206, 125), 108)
+        self.assertEqual(clear_points(12, 1, 6638, 135), 144)
+        self.assertEqual(clear_points(16, 1, 7313, 150), 128)
+        self.assertEqual(clear_points(23, 1, 8437, 170), 138)
+        self.assertEqual(clear_points(9, 1, 6206, 59), 135)
+        self.assertEqual(clear_points(37, 1, 17652, 150), 740)
         self.assertEqual(clear_points(12, 1, 6638), 240)
-        self.assertEqual(clear_points(16, 1, 7313), 320)
-        self.assertEqual(clear_points(23, 1, 8437), 460)
-        self.assertEqual(clear_points(37, 1, 17652), 740)
 
     def test_combo_grows_by_lines_cleared(self):
         game = Game(seed=1)

@@ -99,7 +99,7 @@ class Game:
             self.combo_expiring = False
             self.since_clear = 0
             self.combo_counter = COMBO_COUNTER_BASE + remaining
-            gained += clear_points(self.combo, lines, self.score)
+            gained += clear_points(self.combo, lines, self.score, self.placements)
         elif self.combo_expiring or (self.combo_counter <= 1 and self.combo == 0):
             self.combo = 0
             self.combo_expiring = False

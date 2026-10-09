@@ -51,22 +51,24 @@ def combo_unit(combo):
     return 20
 
 
-# Mnożnik bonusu za czyszczenie maleje z wynikiem partii (wynik sprzed ruchu). Progi z logów faza0, ruch po ruchu
-# (partie 2, 6, 7): 100% do 5991-6076, 80% od 6077 (6447 jeszcze 80%), 60% od 6607 (7123 jeszcze 60%), 40% od 7203
-# (8251 jeszcze 40%), 30% od 8409. Granice leżą w przedziałach (6447,6607], (7123,7203], (8251,8409].
-SCORE_DECAY = ()
-# Wyłączony: partie 1 i 4 zestawu (22,6 i 15,6 tys. pkt) mają bonus 100% przez całą partię; spadek 80/60/40/30% od ~6000
-# pkt wystąpił tylko w partii 10 (skórka różowa), więc zależy od czegoś poza wynikiem. Z spadkiem tempo apka/sym = 1,27
-# (poza ±15%), bez niego 0,88; partia 10 sama wychodzi wtedy 0,49.
+# Mnożnik bonusu za czyszczenie maleje z wynikiem partii (wynik sprzed ruchu), ale tylko w partiach o niskim tempie
+# punktów na postawienie. Progi z logów faza0, ruch po ruchu (partie 4, 8, 10): 100% do 5991-6076, 80% od 6077
+# (6447 jeszcze 80%), 60% od 6607 (7123 jeszcze 60%), 40% od 7203 (8251 jeszcze 40%), 30% od 8409. Te same progi
+# w trzech partiach. Partie 3 i 9 (powyżej 6000 pkt już po 59 i 67 postawieniach, 106-112 pkt na postawienie)
+# mają 100% przez całą partię (do 29 tys.), partie 4, 8, 10 spadały przy 45-50 pkt na postawienie.
+SCORE_DECAY = ((8409, 30), (7203, 40), (6607, 60), (6077, 80))
+DECAY_MAX_RATE = 75   # spadek tylko, gdy wynik / liczba postawień < 75; granica leży w przedziale (50, 106)
 
 
-def score_decay(score):
+def score_decay(score, placements=0):
+    if placements <= 0 or score >= DECAY_MAX_RATE * placements:
+        return 100
     for threshold, percent in SCORE_DECAY:
         if score >= threshold:
             return percent
     return 100
 
 
-def clear_points(combo, lines, score=0):
+def clear_points(combo, lines, score=0, placements=0):
     """Punkty za czyszczenie: combo (po inkrementacji) mnoży bonus bazowy w jednostce combo_unit."""
-    return combo * line_bonus(lines) * combo_unit(combo) * score_decay(score) // 1000
+    return combo * line_bonus(lines) * combo_unit(combo) * score_decay(score, placements) // 1000
