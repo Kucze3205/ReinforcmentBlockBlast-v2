@@ -116,6 +116,20 @@ class SymTest(unittest.TestCase):
             self.assertEqual(wynik["s_sym"], 0.0)
 
 
+class SymSciezkaTest(unittest.TestCase):
+    def test_sciezka_wyjscia_wzgledna_dziala_mimo_chdir_do_wezla(self):
+        # workflow woła `sym node --out sym-out/sym-0.json` z korzenia, a build_policy robi chdir do node
+        with tempfile.TemporaryDirectory() as node, tempfile.TemporaryDirectory() as cwd:
+            for rel in CFG["tylko_do_odczytu"]["sym"]:
+                shutil.copyfile(ROOT / rel, Path(node) / rel)
+            (Path(node) / "policies.py").write_text("def build(weights=None):\n    raise RuntimeError('x')\n")
+            (Path(cwd) / "sym-out").mkdir()
+            subprocess.run([sys.executable, str(ROOT / ".github/evaluator/ocena.py"), "sym", node, "--drzewo", "1",
+                            "--shard", "0/10", "--out", "sym-out/sym-0.json"], check=True, cwd=cwd,
+                           env=dict(os.environ, DEALS_SALT="test"))
+            self.assertTrue((Path(cwd) / "sym-out" / "sym-0.json").exists())
+
+
 class SymOcenaTest(unittest.TestCase):
     def zlicz(self, ruchy, punkty=0):
         with tempfile.TemporaryDirectory() as d:

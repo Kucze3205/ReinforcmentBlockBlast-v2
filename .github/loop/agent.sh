@@ -25,7 +25,7 @@ export KONIEC=$(( $(date +%s) + SESJA_MIN * 60 ))
 timeout "${SESJA_MIN}m" claude -p "$PROMPT" \
   --model claude-sonnet-5-5 --effort medium \
   --permission-mode acceptEdits \
-  --allowedTools "Read,Glob,Grep,Skill,Agent,WebSearch,WebFetch,Bash(git *),Bash(python *),Bash(python3 *),Bash(pytest *),Bash(pip install *)" \
+  --allowedTools "Read,Edit,Write,Glob,Grep,Skill,Agent,WebSearch,WebFetch,Bash(git *),Bash(python *),Bash(python3 *),Bash(pytest *),Bash(pip install *)" \
   --disallowedTools Monitor \
   --settings "$OUT/ustawienia.json" \
   --max-turns 150 --output-format stream-json --verbose \

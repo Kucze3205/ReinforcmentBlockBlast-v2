@@ -109,6 +109,7 @@ def graj(policy, seed, cap, game_cls):
 
 
 def sym(node, drzewo, shard, shardy, out):
+    out = Path(out).resolve()   # build_policy robi chdir do węzła; ścieżka względna z workflow szłaby obok
     cfg = config()
     seeds = rozdania(drzewo, cfg["rozdania"])
     os.environ.pop("DEALS_SALT", None)   # kod węzła nie czyta soli

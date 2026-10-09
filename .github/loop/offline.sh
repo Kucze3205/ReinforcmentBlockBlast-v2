@@ -20,6 +20,7 @@ sesja() {
   (cd "$META" && timeout "${SESJA_MIN}m" claude -p "Przeczytaj ZADANIE.md i wykonaj je." \
     --model claude-sonnet-5-5 --effort high \
     --permission-mode acceptEdits \
+    --allowedTools "Read,Edit,Write,Glob,Grep,Skill" \
     --disallowedTools "Bash,WebSearch,WebFetch,Agent,Monitor" \
     --max-turns 80 --output-format stream-json --verbose \
     2> "$OUT/claude-stderr.txt" \
