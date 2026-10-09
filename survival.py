@@ -1,0 +1,138 @@
+"""
+Polityka przeżycia: przeszukanie wiązką całej tacki (wszystkie kolejności) na
+bitboardach + ocena planszy + ryzyko następnej, losowej tacki.
+
+Cel to nieprzegrywanie (CONTEXT.md), więc punkty nie wchodzą do oceny poza
+drobną premią za czyszczenie linii, która utrzymuje planszę pustą.
+"""
+import random
+from functools import lru_cache
+from itertools import permutations
+
+from pieces import PIECE_POOL
+
+FULL = (1 << 64) - 1
+ROWS = [0xFF << (8 * r) for r in range(8)]
+COLS = [sum(1 << (8 * r + c) for r in range(8)) for c in range(8)]
+LINES = ROWS + COLS
+EDGE_L = COLS[0]
+EDGE_R = COLS[7]
+
+PLACE = []  # PLACE[poza] = maski bitowe wszystkich położeń
+for _p in PIECE_POOL:
+    _h, _w = len(_p.shape), len(_p.shape[0])
+    PLACE.append([
+        (sum(1 << (8 * (y + dy) + x + dx)
+             for dy, row in enumerate(_p.shape) for dx, c in enumerate(row) if c), x, y)
+        for y in range(8 - _h + 1) for x in range(8 - _w + 1)
+    ])
+NPOSE = len(PLACE)
+
+W = {"trans": 3.0, "isolated": 2.0, "fit": 6.0, "fill": 0.5, "risk": 300.0}
+BEAM = 24
+TOP = 4
+SAMPLES = 8
+
+
+def pop(x):
+    return x.bit_count()
+
+
+def clear(b):
+    full = 0
+    for m in LINES:
+        if b & m == m:
+            full |= m
+    return b & ~full, full != 0
+
+
+def fits(b):
+    n = 0
+    for ms in PLACE:
+        for m, _, _ in ms:
+            if not b & m:
+                n += 1
+                break
+    return n
+
+
+NOT_LAST_COL = 0x7F7F7F7F7F7F7F7F
+
+
+@lru_cache(maxsize=1 << 20)
+def evaluate(b):
+    # przejścia pusty/pełny w wierszach i kolumnach, ściana liczy się jako pełna
+    trans = pop(((b ^ (b >> 1)) & NOT_LAST_COL)) + pop(b & EDGE_L) + pop(b & EDGE_R) \
+        + pop((b ^ (b >> 8)) & (FULL >> 8)) + pop(b & ROWS[0]) + pop(b & ROWS[7])
+    around = (((b << 1) & FULL) | EDGE_L) & ((b >> 1) | EDGE_R) \
+        & (((b << 8) & FULL) | ROWS[0]) & ((b >> 8) | ROWS[7])
+    iso = pop(~b & around & FULL)
+    return -(W["trans"] * trans + W["isolated"] * iso + W["fill"] * pop(b)) \
+        + W["fit"] * fits(b)
+
+
+def search(b, poses, beam=BEAM):
+    """Najlepszy liść dla każdej pierwszej akcji: lista (wartość, (poza, maska), plansza)."""
+    res = {}
+    for order in set(permutations(poses)):
+        states = [(b, 0.0, None)]
+        for k in order:
+            nxt = {}
+            for sb, bonus, first in states:
+                for m, px, py in PLACE[k]:
+                    if sb & m:
+                        continue
+                    nb, cl = clear(sb | m)
+                    f = first if first is not None else (k, px, py)
+                    gain = bonus + (5.0 if cl else 0.0) + (400.0 if nb == 0 else 0.0)
+                    key = (nb, f)
+                    if key not in nxt or nxt[key][1] < gain:
+                        nxt[key] = (nb, gain, f)
+            if not nxt:
+                states = []
+                break
+            states = list(nxt.values())
+            if len(states) > beam:
+                states.sort(key=lambda s: evaluate(s[0]) + s[1], reverse=True)
+                states = states[:beam]
+        for sb, bonus, first in states:
+            v = evaluate(sb) + bonus
+            if first not in res or res[first][0] < v:
+                res[first] = (v, first, sb)
+    return list(res.values())
+
+
+class SurvivalPolicy:
+    name = "survival"
+
+    def reset(self, game_seed):
+        self.rng = random.Random(f"surv:{game_seed}")
+
+    def risk(self, b):
+        dead = 0
+        for _ in range(SAMPLES):
+            tray = [self.rng.randrange(NPOSE) for _ in range(3)]
+            if not search(b, tray, beam=4):
+                dead += 1
+        return dead / SAMPLES
+
+    def act(self, game, actions):
+        b = 0
+        for y, row in enumerate(game.board.grid):
+            for x, c in enumerate(row):
+                if c:
+                    b |= 1 << (8 * y + x)
+        slot = {}
+        for i, p in enumerate(game.pieces):
+            if p is not None:
+                slot.setdefault(p.index, i)
+        leaves = search(b, [p.index for p in game.pieces if p is not None])
+        if not leaves:
+            return actions[0]
+        leaves.sort(key=lambda t: t[0], reverse=True)
+        leaves = leaves[:TOP]
+        if len(leaves) > 1:
+            leaves = [(v - W["risk"] * self.risk(sb), f, sb) for v, f, sb in leaves]
+            leaves.sort(key=lambda t: t[0], reverse=True)
+        k, px, py = leaves[0][1]
+        return (slot[k], px, py)
