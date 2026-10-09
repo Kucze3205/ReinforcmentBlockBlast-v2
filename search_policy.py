@@ -29,11 +29,6 @@ def _piece_masks(piece):
 
 _MASKS = {p.index: _piece_masks(p) for p in PIECE_POOL}
 _PROBES = [[m for _, _, m in _MASKS[p.index]] for p in PIECE_POOL]
-# prawdopodobieństwo wylosowania pozy: 1/15 na typ, potem 1/n na orientację
-_W = [0.0] * len(PIECE_POOL)
-for _t in PIECE_TYPES:
-    for _i in _t:
-        _W[_i] = 1.0 / (len(PIECE_TYPES) * len(_t))
 
 
 def _clear(board):
@@ -47,28 +42,8 @@ def _popcount(v):
     return bin(v).count("1")
 
 
+@lru_cache(maxsize=1 << 18)
 def _eval(board):
-    empty = 64 - _popcount(board)
-    e = ~board & _FULL
-    reach = ((e << 1) & _NOT_LEFT) | ((e >> 1) & _NOT_RIGHT) | (e << 8) | (e >> 8)
-    isolated = _popcount(e & ~reach & _FULL)
-    trans = _popcount((board ^ (board >> 1)) & _NOT_RIGHT)
-    trans += _popcount((board ^ (board >> 8)) & (_FULL >> 8))
-    fit = 0.0
-    spots = 0
-    for w, masks in zip(_W, _PROBES):
-        n = 0
-        for m in masks:
-            if not board & m:
-                n += 1
-        if n:
-            fit += w
-            spots += w * min(n, 6)
-    return 120.0 * fit + 12.0 * spots + empty - 2.0 * isolated - trans
-
-
-def _eval_fast(board):
-    """Tania ocena (jak w 2.2) do lookaheadu: ile póz się mieści, bez wag rozkładu."""
     empty = 64 - _popcount(board)
     e = ~board & _FULL
     reach = ((e << 1) & _NOT_LEFT) | ((e >> 1) & _NOT_RIGHT) | (e << 8) | (e >> 8)
@@ -77,11 +52,24 @@ def _eval_fast(board):
     trans += _popcount((board ^ (board >> 8)) & (_FULL >> 8))
     fit = 0
     for masks in _PROBES:
+        c = 0
         for m in masks:
             if not board & m:
-                fit += 1
-                break
-    return 4.0 * fit + empty - 2.0 * isolated - trans
+                c += 1
+                if c == 3:
+                    break
+        fit += c
+    return 1.5 * fit + empty - 2.0 * isolated - trans
+
+
+def _score(board, lines, rest, pieces):
+    s = _eval(board) + 6.0 * lines
+    if board == 0:
+        s += 50
+    for i in rest:
+        if all(board & m for _, _, m in _MASKS[pieces[i].index]):
+            s -= 200
+    return s
 
 
 _POSE_W = [(p, 1.0 / (len(PIECE_TYPES) * len(ts)))
@@ -98,27 +86,17 @@ def _next_tray(board):
             if board & m:
                 continue
             nb, n = _clear(board | m)
-            v = _eval_fast(nb) + 6.0 * n
+            v = _eval(nb) + 6.0 * n
             if best is None or v > best:
                 best = v
         tot += w * (best if best is not None else -300.0)
     return tot
 
 
-def _score(board, lines, rest, pieces):
-    s = _eval(board) + 6.0 * lines
-    if board == 0:
-        s += 50
-    for i in rest:
-        if all(board & m for _, _, m in _MASKS[pieces[i].index]):
-            s -= 200
-    return s
-
-
 class SearchPolicy:
     name = "search"
-    BEAM = 12
-    LOOK = 3
+    BEAM = 40
+    LOOK = 10
     LOOK_W = 1.0
 
     def reset(self, game_seed):
