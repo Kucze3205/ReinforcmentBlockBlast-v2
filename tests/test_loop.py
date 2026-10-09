@@ -186,8 +186,8 @@ class HistoriaTest(Drzewo):
         loop.historia(self.base, 2, "1.3", out, lambda sha: "patch " + sha)
         with open(os.path.join(out, "INDEKS.md"), encoding="utf-8") as fh:
             idx = fh.read()
-        self.assertIn("| 1.1 | korzen | 0.500 | — | a/b |", idx)
-        self.assertIn("| 2.2 | 2.1 | — | 0.300 | g |", idx)
+        self.assertIn("| 1.1 | korzen | 0.500 | — | — | a/b |", idx)
+        self.assertIn("| 2.2 | 2.1 | — | 0.300 | — | g |", idx)
         self.assertNotIn("3.1", idx)
         self.assertIn("| 1 | 1.700 | 2 | `1/INDEKS.md` |", idx)
         with open(os.path.join(out, "2", "2.patch"), encoding="utf-8") as fh:
@@ -195,6 +195,20 @@ class HistoriaTest(Drzewo):
         self.assertFalse(os.path.exists(os.path.join(out, "2", "1.patch")))
         self.assertTrue(os.path.exists(os.path.join(out, "1", "INDEKS.md")))
         self.assertEqual(loop.read_json(os.path.join(out, "1", "2.1.json"))["sha"], "Q")
+
+    def test_indeks_pokazuje_czas_oceny_i_za_wolna(self):
+        self.oceniony("1.1", "A", s_sym=0.5)
+        self.oceniony("2.1", "B", s_sym=0.6)
+        for node, czas, wolna in (("1.1", 3.84, False), ("2.1", 57.8, True)):
+            rec = self.rec(node)
+            rec["oceny"].update(czas_sym_min=czas, sym={"h2": {"za_wolna": wolna}})
+            loop.write_json(loop.record_path(self.base, 1, node), rec)
+        out = os.path.join(self.base, ".historia")
+        loop.historia(self.base, 1, "1.2", out, lambda sha: "")
+        with open(os.path.join(out, "INDEKS.md"), encoding="utf-8") as fh:
+            idx = fh.read()
+        self.assertIn("| 1.1 | korzen | 0.500 | — | 3.8 | g |", idx)
+        self.assertIn("| 2.1 | korzen | 0.600 | — | 57.8 za wolna | g |", idx)
 
 
 if __name__ == "__main__":
