@@ -2,16 +2,25 @@
  "rodzic": "1.1",
  "rodzic_sha": "0c3f976614c3ac7da68aca06173ef45a4de4a84e",
  "kolejnosc": 5,
- "sha": "0c3f976614c3ac7da68aca06173ef45a4de4a84e",
- "stan": "sesja",
- "gist": "",
- "notatki": [],
+ "sha": "269417caac15f60a04e7e86aae4df470e1c25909",
+ "stan": "ocena w toku",
+ "gist": "Ocena planszy ważona rozkładem generatora (prawdop. dopasowania klocka)",
+ "notatki": [
+  "Ocena planszy ważona rozkładem generatora (prawdop. dopasowania klocka)\n\nMechanizm: fit liczony jako suma prawdopodobieństw póz (1/15 na typ, 1/n na orientację)\nzamiast równej wagi 41 póz, plus premia za liczbę miejsc (do 6) na każdą pozę; beam 10->12.\nHistoria: 1.1 (0.562) najlepsze; 2.1-4.1 (0.26-0.31) to inne warianty beamu. Nie mierzone,\nsprawdzono tylko że działa (~0.025 s/ruch przy beam 12).\nRyzyko: wagi 120/12 ręczne; beam 40 za wolny (~0.08 s/ruch).\n\nCo dalej: zrobione - ten commit. Następnie: po ocenie stroić 120/12 albo dodać\nparę-klocków w fit. Nie powtarzać: beam >=40.\n\nCo-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+ ],
  "koszt": {
-  "tury": 0,
-  "usd": 0.0,
-  "minuty": 0.0
+  "tury": 15,
+  "usd": 0.208,
+  "minuty": 3.1
  },
  "oczekiwanie_min": 0.0,
  "kontynuacje_tur": 0,
- "sesje": []
+ "sesje": [
+  {
+   "start": "2026-10-09T12:02:49Z",
+   "koniec": "2026-10-09T12:05:57Z",
+   "tury": 15,
+   "przyczyna": "terminal_reason=completed"
+  }
+ ]
 }
