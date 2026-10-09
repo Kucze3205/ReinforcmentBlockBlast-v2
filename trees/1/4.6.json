@@ -2,16 +2,25 @@
  "rodzic": "4.5",
  "rodzic_sha": "449c1d8648f613deb6237b019f75e7e0d52b8fa7",
  "kolejnosc": 23,
- "sha": "449c1d8648f613deb6237b019f75e7e0d52b8fa7",
- "stan": "sesja",
- "gist": "",
- "notatki": [],
+ "sha": "728008175dd1f08d4ceec7decea73fde241360b9",
+ "stan": "ocena w toku",
+ "gist": "Waga przejść (trans) w _eval 1 -> 3, wagi wyniesione do W",
+ "notatki": [
+  "Waga przejść (trans) w _eval 1 -> 3, wagi wyniesione do W\n\nMechanizm: poszarpanie planszy karane 3x mocniej. Wcześniejsze próby stroiły tylko LOOK/DEAD/BEAM, nie wagi _eval.\nDowód: lokalny test dymny (48 partii, limit 500 postawień; tools/tune_w.py), trans 1/1.5/2/3 -> śr. 355/386/384/398, przegranych 26/25/25/20; isolated 4 i 1, fit 3, trans 0.5 gorsze. To nie ocena, tylko wskaźnik kierunku.\nNie powtórka: strojenie wag _eval, nie lookaheadu.\nRyzyko: szum (48 partii); trend monotoniczny, optimum może leżeć wyżej.\n\nCo dalej: zrobione - ten commit. Następny krok: trans 4-6, potem fit razem z trans. Nie powtarzać: isolated<=1 lub >=4, fit 3 przy trans 1.\n\nCo-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+ ],
  "koszt": {
-  "tury": 0,
-  "usd": 0.0,
-  "minuty": 0.0
+  "tury": 24,
+  "usd": 0.2927,
+  "minuty": 109.7
  },
  "oczekiwanie_min": 0.0,
  "kontynuacje_tur": 0,
- "sesje": []
+ "sesje": [
+  {
+   "start": "2026-10-09T15:44:08Z",
+   "koniec": "2026-10-09T17:33:51Z",
+   "tury": 24,
+   "przyczyna": "terminal_reason=completed"
+  }
+ ]
 }
