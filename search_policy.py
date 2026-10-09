@@ -42,7 +42,7 @@ def _popcount(v):
     return bin(v).count("1")
 
 
-W = [1.5, 2.0, 3.0]  # wagi _eval: fit, isolated, trans
+W = [1.5, 2.0, 4.0]  # wagi _eval: fit, isolated, trans
 
 
 def _eval(board):
