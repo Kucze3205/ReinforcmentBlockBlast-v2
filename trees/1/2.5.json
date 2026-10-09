@@ -2,16 +2,25 @@
  "rodzic": "2.4",
  "rodzic_sha": "20bfc7c75f9e6e2ebaf91bc2997c0c818c9235e7",
  "kolejnosc": 18,
- "sha": "20bfc7c75f9e6e2ebaf91bc2997c0c818c9235e7",
- "stan": "sesja",
- "gist": "",
- "notatki": [],
+ "sha": "6cc893bd83830ec2f29054787a6de40bbe19fec5",
+ "stan": "ocena w toku",
+ "gist": "3.3 (0.885) + ryzyko całej następnej tacki (12 próbnych tacek, pełne DFS) w lookaheadzie",
+ "notatki": [
+  "3.3 (0.885) + ryzyko całej następnej tacki (12 próbnych tacek, pełne DFS) w lookaheadzie\n\nMechanizm: baza to zmierzona 3.3 (0.885: BEAM 40, LOOK 6, LOOK_W 1). Do rerankingu liści\ndodano -300 * ułamek 12 stałych próbnych tacek (3 klocki wg generatora), których nie da się\nrozegrać w całości z danej planszy (DFS po kolejnościach i położeniach, z czyszczeniem linii).\nDowód z historii: LOOK_W 2/LOOK 8 (2.4: 0.867) i LOOK 10 (1.4: 0.871, 3.4: 0.883) nie pobiły\n0.885, więc strojenie jednego klocka lookaheadu się wyczerpało; przegrane 3.3 to zgony\ntacek nie do ułożenia (54/200), a lookahead patrzy tylko na 1 klocek. 3.2 (rerank ryzykiem)\nbył na słabej bazie 1.1 i bez _next_tray; tu jest to dodatek do najlepszej bazy.\nRyzyko: RISK_W=300 niestrojone, 12 próbek zaszumione; ok. 72 ms/ruch.\nWynik NIEZMIERZONY, smoke 300 ruchów bez wywrotki.\n\nCo dalej: zrobione - ten commit. Następny krok: po pomiarze porównać z 0.885; jeśli gorzej,\nzmienić RISK_W/liczbę próbek, nie wracać do samego LOOK/LOOK_W.\nNie powtarzać: strojenia LOOK, LOOK_W, BEAM.\n\nCo-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+ ],
  "koszt": {
-  "tury": 0,
-  "usd": 0.0,
-  "minuty": 0.0
+  "tury": 18,
+  "usd": 0.2482,
+  "minuty": 2.4
  },
  "oczekiwanie_min": 0.0,
  "kontynuacje_tur": 0,
- "sesje": []
+ "sesje": [
+  {
+   "start": "2026-10-09T14:34:09Z",
+   "koniec": "2026-10-09T14:36:32Z",
+   "tury": 18,
+   "przyczyna": "terminal_reason=completed"
+  }
+ ]
 }
