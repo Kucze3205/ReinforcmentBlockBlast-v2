@@ -18,7 +18,8 @@ _LOW56 = (1 << 56) - 1
 BEAM = 70
 FINAL = 8          # tyle liści dostaje drogą ocenę (fit + ryzyko następnej tacki)
 SAMPLES = 24       # próbne tacki do oceny ryzyka
-W = {"empty": 1.0, "iso": 4.0, "trans": 3.0, "fit": 1.5, "risk": 300.0, "lines": 2.0, "dead": 40.0, "zero": 5.0}
+W = {"empty": 1.0, "iso": 4.0, "trans": 3.0, "fit": 1.5, "risk": 300.0, "lines": 2.0, "dead": 40.0, "zero": 5.0, "hard": 400.0}
+HARD_TYPES = (7, 10, 4, 6, 12)   # indeksy w PIECE_TYPES: 3x3, duże L, 1x5, 2x3, przekątna 3
 
 
 def _pose_masks():
@@ -133,6 +134,9 @@ class SurvivalPolicy:
     def reset(self, game_seed):
         self.rng = random.Random(f"surv:{game_seed}")
         self.samples = [[self._rand_pose() for _ in range(3)] for _ in range(SAMPLES)]
+        hard = [self.rng.choice(PIECE_TYPES[t]) for t in HARD_TYPES]
+        self.hard = [[hard[i], hard[j], hard[k]] for i in range(5)
+                     for j in range(i, 5) for k in range(j, 5)]
 
     def _rand_pose(self):
         return self.rng.choice(self.rng.choice(PIECE_TYPES))
@@ -176,6 +180,8 @@ class SurvivalPolicy:
             v = sc + _fit_score(b)
             bad = sum(1 for s in self.samples if not _playable(b, s))
             v -= W["risk"] * bad / len(self.samples)
+            if W["hard"]:
+                v -= W["hard"] * sum(1 for s in self.hard if not _playable(b, s)) / len(self.hard)
             if best_v is None or v > best_v:
                 best, best_v = first, v
         if best is None:
