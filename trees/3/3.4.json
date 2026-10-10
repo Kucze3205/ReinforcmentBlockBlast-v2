@@ -2,16 +2,25 @@
  "rodzic": "3.3",
  "rodzic_sha": "7e436efd935b7e6c693ad5c876853823c35417ae",
  "kolejnosc": 15,
- "sha": "7e436efd935b7e6c693ad5c876853823c35417ae",
- "stan": "sesja",
- "gist": "",
- "notatki": [],
+ "sha": "2746b004513363a6feb0e559f8557a0f24e9953d",
+ "stan": "ocena w toku",
+ "gist": "Ryzyko losowe: dokładne ważone multizbiory wszystkich 15 typów zamiast 12 próbek, końcówka 48 -> 24",
+ "notatki": [
+  "Ryzyko losowe: dokładne ważone multizbiory wszystkich 15 typów zamiast 12 próbek, końcówka 48 -> 24\n\nMechanizm: _all_risk liczy dokładnie (680 multizbiorów, waga=liczba uporządkowań, obroty losowane co ruch)\nprawdopodobieństwo niegrywalnej tacki; zastępuje zaszumione 12 próbek w _risk (4.3: 36 próbek dało 0.925, bez zmiany,\nwięc szum próbkowania nie był wąskim gardłem - tu pokrycie jest pełne). Rozszerzenie idei hard-ważonego z 3.7 (drzewo 2) na wszystkie typy.\nLokalnie: smoke bez wywrotki, ok. 45 ms/ruch (wcześniej 6). Wyniku nie mierzę.\nRyzyko: czas; final_crowded wraca do 24 dla czasu (48 w 3.3 nic nie dało).\n\nCo dalej: zrobione (ten commit). Następny krok: jeśli < 0.925, strojenie risk_w (60) lub głębszy lookahead 2 tacek. Nie powtarzać: więcej próbek losowych, final_crowded w górę.\n\nCo-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+ ],
  "koszt": {
-  "tury": 0,
-  "usd": 0.0,
-  "minuty": 0.0
+  "tury": 15,
+  "usd": 0.2453,
+  "minuty": 2.8
  },
  "oczekiwanie_min": 0.0,
  "kontynuacje_tur": 0,
- "sesje": []
+ "sesje": [
+  {
+   "start": "2026-10-10T07:24:26Z",
+   "koniec": "2026-10-10T07:27:15Z",
+   "tury": 15,
+   "przyczyna": "terminal_reason=completed"
+  }
+ ]
 }
