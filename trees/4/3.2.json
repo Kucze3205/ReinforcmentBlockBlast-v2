@@ -2,16 +2,25 @@
  "rodzic": "3.1",
  "rodzic_sha": "2b3a71304781e8490a2ee96da062f9e3639ce089",
  "kolejnosc": 7,
- "sha": "2b3a71304781e8490a2ee96da062f9e3639ce089",
- "stan": "sesja",
- "gist": "",
- "notatki": [],
+ "sha": "f7a146d735d6842cc6cf57abbddb68b005852fa0",
+ "stan": "ocena w toku",
+ "gist": "Szerokość wiązki 40 -> 100 w SearchPolicy",
+ "notatki": [
+  "Szerokość wiązki 40 -> 100 w SearchPolicy\n\nMechanizm: bez zmian w ocenie; tylko szerszy beam przy przeszukiwaniu kolejności i póz tacki.\nDowód z historii: w drzewie 2 węzeł 3.1 (beam 40 -> 100) dał 0.882 wobec 0.781 (1.1) i 0.680 (2.1) przy\ntych samych cechach; bieżący kod ma beam 40, a wagi strojono tylko losowo (w szumie). Nie powtórka:\nw tym drzewie beam nie był ruszany. Lokalnie tylko sprawdzony czas (~67 ms/ruch) i brak wywrotek, to nie ocena.\nRyzyko: szerszy beam może premiować ocenę statyczną kosztem ryzyka (final=20 bez zmian).\n\nCo dalej: zrobione (ten commit). Następny krok: po ocenie ryzyko trudnych tacek ważone multizbiorem\n(2/3.7) i hard-tacki przy każdym ruchu. Nie powtarzać: losowe strojenie wag.\n\nCo-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+ ],
  "koszt": {
-  "tury": 0,
-  "usd": 0.0,
-  "minuty": 0.0
+  "tury": 11,
+  "usd": 0.1431,
+  "minuty": 2.3
  },
  "oczekiwanie_min": 0.0,
  "kontynuacje_tur": 0,
- "sesje": []
+ "sesje": [
+  {
+   "start": "2026-10-10T11:04:46Z",
+   "koniec": "2026-10-10T11:07:03Z",
+   "tury": 11,
+   "przyczyna": "terminal_reason=completed"
+  }
+ ]
 }
