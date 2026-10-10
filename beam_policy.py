@@ -101,11 +101,25 @@ def _tray_ok(b, poses):
     return False
 
 
+def _tray_margin(b, poses, cap=2):
+    """Ile pierwszych ruchów (klocek, pozycja) prowadzi do postawienia całej tacki; do cap."""
+    n = 0
+    for k, pose in enumerate(poses):
+        left = poses[:k] + poses[k + 1:]
+        for _, _, m in _POSE_MASKS[pose]:
+            if not b & m and _tray_ok(_clear(b | m), left):
+                n += 1
+                if n >= cap:
+                    return n
+    return n
+
+
 _TYPES = [[p.index for p in PIECE_POOL if p.type_index == t] for t in range(15)]
 RISK_TRAYS = 12
 RISK_W = 25.0
 HARD_TYPES = (7, 10, 4, 6, 12)  # 3x3, duże L, 1x5, 2x3, przekątna 3
 HARD_W = 400.0
+FRAG_W = 100.0  # kara za tacki trudne, które wchodzą tylko jednym ruchem
 
 
 def _hard_trays(rng):
@@ -162,7 +176,8 @@ class BeamPolicy:
             bad = sum(not _tray_ok(b, t) for t in trays)
             s = _cheap(b) - W["fit"] * _fit(b) + RISK_W * bad
             if HARD_W:
-                s += HARD_W * sum(not _tray_ok(b, t) for t in self._hard) / len(self._hard)
+                mg = [_tray_margin(b, t) for t in self._hard]
+                s += (HARD_W * sum(g == 0 for g in mg) + FRAG_W * sum(g == 1 for g in mg)) / len(mg)
             if bs is None or s < bs:
                 best, bs = first, s
         return best if best in actions else actions[0]
