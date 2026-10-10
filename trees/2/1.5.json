@@ -2,16 +2,25 @@
  "rodzic": "1.4",
  "rodzic_sha": "a1135c2db0cab52fa7366ac7331c853a31a56aff",
  "kolejnosc": 17,
- "sha": "a1135c2db0cab52fa7366ac7331c853a31a56aff",
- "stan": "sesja",
- "gist": "",
- "notatki": [],
+ "sha": "426714b2f092ecf93bc04fdc2d62a7881ca56d62",
+ "stan": "ocena w toku",
+ "gist": "Fit po typach (zero=5, do 4 położeń na typ) w ocenie liści wiązki, razem z ryzykiem trudnych tacek",
+ "notatki": [
+  "Fit po typach (zero=5, do 4 położeń na typ) w ocenie liści wiązki, razem z ryzykiem trudnych tacek\n\nMechanizm: _fit liczy po 15 typach klocków (min 4 położenia, typ bez miejsca = -5) zamiast\npo 1 pozie na klocek; port z 4.2/4.4. Baza: 1.4 (0.901, hard=400, wiązka 100).\nDowód z historii: 4.4 = hard 400 + fit po typach = 0.925 (najlepszy w drzewie 2), 3.4 0.921;\n1.4 miało hard, ale stary fit. Nie powtórka: 1.x nie miało fitu po typach.\nSprawdzono tylko, że 2 partie po 200 postawień idą bez wywrotki (ok. 2.7 s/partię); wynik niezmierzony.\nRyzyko: czas ruchu; skala fit zmienia wagę względem cheap.\n\nCo dalej: zrobione - ten commit. Następny krok: po ocenie, jeśli < 0.92, BEAM 70 lub\nFIT_LEAVES 30->8 jak w 4.4 (FINAL 8). Nie powtarzać: dead, hard=1000, BEAM 200.\n\nCo-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+ ],
  "koszt": {
-  "tury": 0,
-  "usd": 0.0,
-  "minuty": 0.0
+  "tury": 13,
+  "usd": 0.194,
+  "minuty": 1.1
  },
  "oczekiwanie_min": 0.0,
  "kontynuacje_tur": 0,
- "sesje": []
+ "sesje": [
+  {
+   "start": "2026-10-10T04:19:35Z",
+   "koniec": "2026-10-10T04:20:42Z",
+   "tury": 13,
+   "przyczyna": "terminal_reason=completed"
+  }
+ ]
 }
