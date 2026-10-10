@@ -156,6 +156,7 @@ class BeamPolicy:
             return actions[0]
         done.sort(key=lambda s: _cheap(s[0]))
         trays = _trays(self._rng)
+        self._hard = _hard_trays(self._rng)
         best, bs = None, None
         for b, first in done[:FIT_LEAVES]:
             bad = sum(not _tray_ok(b, t) for t in trays)
