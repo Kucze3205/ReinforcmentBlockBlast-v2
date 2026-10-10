@@ -2,16 +2,25 @@
  "rodzic": "1.1",
  "rodzic_sha": "4002325a1b856555da0be430f08de21281ad8c89",
  "kolejnosc": 5,
- "sha": "4002325a1b856555da0be430f08de21281ad8c89",
- "stan": "sesja",
- "gist": "",
- "notatki": [],
+ "sha": "3e9ba0506ba109517fd85e1b5a2fbfcf9cdbd937",
+ "stan": "ocena w toku",
+ "gist": "Ocena liści: kieszenie, bonus za linie n^2 i mobilność (z 3.1) w survival, zachowane ryzyko hard",
+ "notatki": [
+  "Ocena liści: kieszenie, bonus za linie n^2 i mobilność (z 3.1) w survival, zachowane ryzyko hard\n\nMechanizm: w survival.py cheap() liczy teraz izolowane dziury i kieszenie (puste pole z >=3\nzablokowanymi sąsiadami, bitowo), zapełnienie 8, przejścia 8; bonus za czyszczenie 10*n^2 zamiast\n40*linie; w ryzyku odjęta mobilność (mob_w 1.4, suma rozmiarów mieszczących się póz).\nRyzyko hard (multizbiory 1/3/6, losowane co ruch) i frag bez zmian.\nDowód z historii: 4/3.1 (kieszenie+mobilność, 0.901) i 4/4.1 (0.881) biły 1.1 (0.813) przy\ninnej, bogatszej ocenie planszy; mój cheap nie miał kieszeni. Nie powtórka: kombinacja ryzyka\nhard z 2/3.7 (0.949) z cechami planszy z 3.1, czego żadna próba nie miała.\nLokalnie tylko dym: 4 partie x 300 ruchów, ok. 33 ms/ruch; seed 3 przegrywa w ruchu ~262\n(poprzednia wersja przeżyła 300 w tym dymie) - niemierzone, może szum. Wagi pocket 35, trans 8\nto kompromis między 3.1 (70/22) a poprzednią wersją (bez kieszeni), nieostrojone.\nRyzyko: pogorszenie przeżycia względem 1.1.\n\nCo dalej: zrobione (ten commit). Jeśli ocena < 0.813: wrócić do cheap z 4002325 i zmienić\ntylko bonus linii. Nie powtarzać: hard=1000, dead.\n\nCo-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+ ],
  "koszt": {
-  "tury": 0,
-  "usd": 0.0,
-  "minuty": 0.0
+  "tury": 23,
+  "usd": 0.3759,
+  "minuty": 3.6
  },
  "oczekiwanie_min": 0.0,
  "kontynuacje_tur": 0,
- "sesje": []
+ "sesje": [
+  {
+   "start": "2026-10-10T11:04:40Z",
+   "koniec": "2026-10-10T11:08:18Z",
+   "tury": 23,
+   "przyczyna": "terminal_reason=completed"
+  }
+ ]
 }
