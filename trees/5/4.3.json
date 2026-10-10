@@ -2,16 +2,25 @@
  "rodzic": "4.2",
  "rodzic_sha": "19bb2c48296c165d095866e750b885aa59628bc7",
  "kolejnosc": 13,
- "sha": "19bb2c48296c165d095866e750b885aa59628bc7",
- "stan": "sesja",
- "gist": "",
- "notatki": [],
+ "sha": "e42401b84f16d739d3e9c508664a333ea9a38cf0",
+ "stan": "ocena w toku",
+ "gist": "Ryzyko trudnych tacek: osobna poza dla każdego miejsca w tacce (5/4.3)",
+ "notatki": [
+  "Ryzyko trudnych tacek: osobna poza dla każdego miejsca w tacce (5/4.3)\n\nMechanizm:\n- hard: na ruch losuję 3 pozy na każdy z 5 trudnych typów (było 1 na typ)\n- HARD_TRIPLES: dla multizbioru c dochodzi indeks wystąpienia (slots); waga perms/125 bez zmian\n- trójka (a,a,b) sprawdzana z dwiema niezależnymi pozami typu a, nie z jedną powieloną\n- koszt bez zmian: 35 tray_ok na liść\n\nDowód z historii:\n- 5/4.2 = 0.978 (54 przegrane), 5/2.1 = 0.983 (47 przegranych)\n- 2.1 losuje każde miejsce tacki niezależnie (search_policy._hard_trays)\n- 4.2 (i 4.1) przypisywały obu kopiom typu tę samą pozę; generator.py losuje klocki niezależnie\n\nDlaczego to nie powtórka: 4.1 i 4.2 nie miały tej poprawki. Zmiana dotyczy tylko przydziału póz, nie wag ani zbioru typów.\n\nRyzyko: wynik niezmierzony. Efekt może być mały: dotyczy tylko trójek z powtórzonym typem, a pojedyncza próbka póz na ruch nadal jest szumna. Zbiór HARD_TYPES [3,4,7,6,10] różni się od 2.1 [4,6,7,10,9] (2.1 ma L, 4.2 ma belkę 4); nie ruszany tutaj.\nTesty: 16 z 17 przechodzi; jedyny błąd to tkinter (turtle w model.py), istniał przed zmianą. Smoke: 3 partie (seedy 1-3, limit 300) bez wyjątków.\n\nCo dalej:\n- zrobione: dab34cd (węzeł 4.1), 19bb2c4 (węzeł 4.2), ten commit (węzeł 4.3)\n- następny krok: ocena 5/4.3; jeśli wynik nadal poniżej 0.983, osobna próba ze zbiorem HARD_TYPES jak w 2.1, bez łączenia z tą zmianą\n- czego nie powtarzać: strojenia HARD_W przy tym samym estymatorze; zwiększania liczby tacek MC w liściu bez wyniku tego commitu\n\nCo-Authored-By: Claude Code <noreply@anthropic.com>"
+ ],
  "koszt": {
-  "tury": 0,
-  "usd": 0.0,
-  "minuty": 0.0
+  "tury": 27,
+  "usd": 1.8368,
+  "minuty": 8.3
  },
  "oczekiwanie_min": 0.0,
  "kontynuacje_tur": 0,
- "sesje": []
+ "sesje": [
+  {
+   "start": "2026-10-10T16:58:25Z",
+   "koniec": "2026-10-10T17:06:40Z",
+   "tury": 27,
+   "przyczyna": "terminal_reason=completed"
+  }
+ ]
 }
