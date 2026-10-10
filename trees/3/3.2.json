@@ -2,16 +2,25 @@
  "rodzic": "3.1",
  "rodzic_sha": "2543a5b102ee1c29ba0b6ac2aa594e0cafe2aee1",
  "kolejnosc": 7,
- "sha": "2543a5b102ee1c29ba0b6ac2aa594e0cafe2aee1",
- "stan": "sesja",
- "gist": "",
- "notatki": [],
+ "sha": "594eaa46fabd9bb6655118dc2dbd6f00e98a27fb",
+ "stan": "ocena w toku",
+ "gist": "Ocena układu: fit po typach i wolne 3x3 zamiast dead, wiązka 60 -> 100",
+ "notatki": [
+  "Ocena układu: fit po typach i wolne 3x3 zamiast dead, wiązka 60 -> 100\n\nMechanizm: _eval zastępuje karę dead (typ bez położenia) cechą fit z drzewa 2 (do 4 położeń na typ,\nbrak położenia = -5 * 8) oraz premią za wolne pola 3x3 (limit 8); BEAM 100. Ryzyko trudnych tacek bez zmian.\nDowód: 3.1 (ta gałąź) 0.746 vs drzewo 2: wiązka 100 + fit po typach + sq dawały 0.88-0.93 przy tym samym\nryzyku hard. Nie powtórka: kombinacja elementów z drzewa 2, których w tym łańcuchu brakowało.\nLokalnie (nie ocena): smoke 4 partie x 300 ruchów bez wywrotki, ok. 28 ms/ruch.\nRyzyko: wagi fit/sq (0.6, 3.0) nieostrojone; wolniejszy ruch.\n\nCo dalej: zrobione (ten commit). Następny krok: po ocenie, jeśli < 0.855, wziąć szybką bazę 4.1\n(.historia/3/4.patch) i dołożyć hard ważone 1/3/6; potem FINAL adaptacyjne. Nie powtarzać: dead, globalne FINAL/SAMPLES.\n\nCo-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+ ],
  "koszt": {
-  "tury": 0,
-  "usd": 0.0,
-  "minuty": 0.0
+  "tury": 10,
+  "usd": 0.1998,
+  "minuty": 2.6
  },
  "oczekiwanie_min": 0.0,
  "kontynuacje_tur": 0,
- "sesje": []
+ "sesje": [
+  {
+   "start": "2026-10-10T06:43:03Z",
+   "koniec": "2026-10-10T06:45:39Z",
+   "tury": 10,
+   "przyczyna": "terminal_reason=completed"
+  }
+ ]
 }
