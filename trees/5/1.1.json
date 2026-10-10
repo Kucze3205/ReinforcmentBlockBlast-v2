@@ -2,16 +2,26 @@
  "rodzic": "korzen",
  "rodzic_sha": "caf8e7251570b57ad4a6ebb26f3b0b13e8326fcc",
  "kolejnosc": 1,
- "sha": "caf8e7251570b57ad4a6ebb26f3b0b13e8326fcc",
- "stan": "sesja",
- "gist": "",
- "notatki": [],
+ "sha": "32978f648d838bdbc8172718cda7d0552b1913ed",
+ "stan": "ocena w toku",
+ "gist": "Ocena liści: srednia wartosc planszy po ulozeniu probnej nastepnej tacki (dwa poziomy)",
+ "notatki": [
+  "Ocena liści: srednia wartosc planszy po ulozeniu probnej nastepnej tacki (dwa poziomy)\n\nMechanizm: dla top-8 lisci wiazki, oprocz binarnego ryzyka, liczymy srednia (wazona) taniej\noceny najlepszego ulozenia 6 probnych nastepnych tacek (wezsza wiazka 5), niegrywalna = 100.\nDaje gradient zamiast samego 0/1 ryzyka. Dodano tez etap posredni: mobilnosc bitowa\n(suma 1/(1+liczba poloz.) po 41 pozach) i male obszary dla top-80 lisci.\nDowod: lokalny test dymny (nie ocena, 12 partii do 500 ruchow): bez tej cechy 4-5 z 12\ndoszlo do 500, z nia 6-7 z 12; koszt ok. 6 ms/ruch (poprzednio ok. 3).\nRyzyko: czas oceny (limit nieznany; w historii beam 80-100 bylo 'za wolna').\n\nCo dalej: zrobione (ten commit). Nastepny krok: po ocenie - jesli za wolna, zmniejsz NEXT_K/BEAM;\njesli s_sym < 0.9, wzmocnic ocene (hard-trojki z wagami multizbioru z drzewa 2/3.7).\n\nCo-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>",
+  "Dodaj policies.build: wiazka po tacce na bitboardach (survival.py) z ryzykiem i mobilnoscia\n\nMechanizm: SearchPolicy planuje cala tacke (3 klocki, dowolna kolejnosc), wiazka 24 po\ntaniej ocenie (przejscia, izolowane pola, wolne pola), a top-10 lisci dostaje droga ocene:\nryzyko niegrywalnej nastepnej tacki (40 prob., wazone, DFS), male obszary, mobilnosc.\nDowod z historii: kod z drzew 1-4 nie jest w repo (build brak), wiec to odbudowa od zera.\nTest dymny lokalnie (nie ocena): dziala bez wywrotki, ~2.5 ms/ruch; czesc partii konczy sie\nprzed 600 ruchami, wiec ocena slaba - wymaga strojenia.\n\nCo dalej: zrobione (ten commit). Nastepny krok: mocniejsza ocena planszy.\n\nCo-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+ ],
  "koszt": {
-  "tury": 0,
-  "usd": 0.0,
-  "minuty": 0.0
+  "tury": 60,
+  "usd": 1.05,
+  "minuty": 9.1
  },
  "oczekiwanie_min": 0.0,
  "kontynuacje_tur": 0,
- "sesje": []
+ "sesje": [
+  {
+   "start": "2026-10-10T14:27:54Z",
+   "koniec": "2026-10-10T14:36:59Z",
+   "tury": 60,
+   "przyczyna": "terminal_reason=completed"
+  }
+ ]
 }
