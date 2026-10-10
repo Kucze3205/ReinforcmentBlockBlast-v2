@@ -143,7 +143,7 @@ def playable(b, pieces):
 class SearchPolicy:
     name = "search"
 
-    def __init__(self, beam=60, final=10, samples=40, w=None, risk_w=300.0, seed=0, lw=0.0, mob_w=None,
+    def __init__(self, beam=60, final=20, samples=50, w=None, risk_w=1000.0, seed=0, lw=0.0, mob_w=None,
                  vw=None, vscale=100.0, risk_scale=1.0, fit_w=0.0, fit_cap=4.0, zero_w=0.0,
                  k2=0, n2=200, rk=0, rm=6, depth=2, qbeam=6, roll_w=300.0, shape_w=0.0):
         self.k2, self.n2 = k2, n2
