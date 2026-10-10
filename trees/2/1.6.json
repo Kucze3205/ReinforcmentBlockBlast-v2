@@ -2,16 +2,25 @@
  "rodzic": "1.5",
  "rodzic_sha": "426714b2f092ecf93bc04fdc2d62a7881ca56d62",
  "kolejnosc": 21,
- "sha": "426714b2f092ecf93bc04fdc2d62a7881ca56d62",
- "stan": "sesja",
- "gist": "",
- "notatki": [],
+ "sha": "1b04d3ecbbf4a981c4060e9353d53251544b5d4c",
+ "stan": "ocena w toku",
+ "gist": "Hard-tacki losowane na nowo przy każdym ruchu (mechanizm 3.5) na bazie 1.5",
+ "notatki": [
+  "Hard-tacki losowane na nowo przy każdym ruchu (mechanizm 3.5) na bazie 1.5\n\nMechanizm: dotąd 35 trudnych tacek (HARD_W=400) losowane raz na partię (jeden obrót na typ). Teraz act() losuje je od nowa przy każdym ruchu, więc kara uśrednia po obrotach. Dowód: 3.5 (0.934) vs 4.4 (0.925), ten sam pomysł na innej bazie. Ta baza: 1.5 (0.922, fit po typach + hard + beam 100, 30 liści).\nNie powtórka: 1.5 miał stały zestaw na partię. Kombinacja nieprzetestowana.\nSprawdzono tylko, że build() działa; wyniku nie mierzyłem.\nRyzyko: szum w ocenie ruchu.\n\nCo dalej: zrobione (ten commit). Następny krok: po ocenie, jeśli gorzej niż 0.922, wrócić do stałego zestawu. Nie powtarzać: dead, hard=1000, FINAL/SAMPLES w górę.\n\nCo-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+ ],
  "koszt": {
-  "tury": 0,
-  "usd": 0.0,
-  "minuty": 0.0
+  "tury": 10,
+  "usd": 0.1386,
+  "minuty": 1.3
  },
  "oczekiwanie_min": 0.0,
  "kontynuacje_tur": 0,
- "sesje": []
+ "sesje": [
+  {
+   "start": "2026-10-10T04:52:56Z",
+   "koniec": "2026-10-10T04:54:14Z",
+   "tury": 10,
+   "przyczyna": "terminal_reason=completed"
+  }
+ ]
 }
