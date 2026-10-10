@@ -2,16 +2,26 @@
  "rodzic": "2.2",
  "rodzic_sha": "0e0e9b05c7a18678ee9cfba737a3729aaca8b748",
  "kolejnosc": 10,
- "sha": "0e0e9b05c7a18678ee9cfba737a3729aaca8b748",
- "stan": "sesja",
- "gist": "",
- "notatki": [],
+ "sha": "5736de0d0cd2e87f87c0c74a3fc3ab6223768428",
+ "stan": "ocena w toku",
+ "gist": "Waga hard 150 -> 400 (domyślna zgodna z notatką poprzedniego commitu)",
+ "notatki": [
+  "Waga hard 150 -> 400 (domyślna zgodna z notatką poprzedniego commitu)\n\nLokalnie 24 partie/limit 500: 9 przegranych (150) -> 5 (400). To nie ocena.\n\nCo dalej: zrobione 219dcf6 + ten commit. Następny krok: dobór zbioru trudnych typów, tańszy DFS. Nie powtarzać: deadrem, SAMPLES w górę, hard=1000.\n\nCo-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>",
+  "Ryzyko trudnych tacek: 35 trójek z 5 najtrudniejszych typów klocków, waga 400\n\nMechanizm: do oceny FINAL liści dodane DFS-owe sprawdzenie grywalności 35 tacek złożonych z\n3x3, dużego L, 1x5, 2x3, przekątnej 3 (po jednej losowej orientacji na grę); kara hard*odsetek niegrywalnych.\nDowód: plansze przegranych kończą się trudnym klockiem; losowe 12 próbek rzadko je zawiera.\nLokalnie (24 partie, limit 500, NIE ocena): przegranych 11 (hard=0) -> 9 (150) -> 5 (400); hard=1000: 11; 400+risk100: 5.\nRyzyko: ~2.4x wolniej, szum lokalny.\n\nCo dalej: zrobione - ten commit. Następny krok: dobór zbioru trudnych typów/wag, tańszy DFS. Nie powtarzać: deadrem, SAMPLES w górę, hard=1000.\n\nCo-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+ ],
  "koszt": {
-  "tury": 0,
-  "usd": 0.0,
-  "minuty": 0.0
+  "tury": 16,
+  "usd": 0.24,
+  "minuty": 6.3
  },
  "oczekiwanie_min": 0.0,
  "kontynuacje_tur": 0,
- "sesje": []
+ "sesje": [
+  {
+   "start": "2026-10-10T03:00:19Z",
+   "koniec": "2026-10-10T03:06:35Z",
+   "tury": 16,
+   "przyczyna": "terminal_reason=completed"
+  }
+ ]
 }
