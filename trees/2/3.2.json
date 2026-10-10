@@ -2,16 +2,25 @@
  "rodzic": "3.1",
  "rodzic_sha": "6c1ae687f803b436c65aaa9adf5b140e5d84296f",
  "kolejnosc": 7,
- "sha": "6c1ae687f803b436c65aaa9adf5b140e5d84296f",
- "stan": "sesja",
- "gist": "",
- "notatki": [],
+ "sha": "927276634fd6982d4d17cfedac9903628139ebe9",
+ "stan": "ocena w toku",
+ "gist": "Cecha dead: kara za typy klocków bez żadnego położenia, w ocenie każdego liścia wiązki",
+ "notatki": [
+  "Cecha dead: kara za typy klocków bez żadnego położenia, w ocenie każdego liścia wiązki\n\nMechanizm: _dead_types(b) liczy z 15 typów te bez miejsca na planszy; W[dead]=40 odjęte w _cheap,\nwięc działa na całą wiązkę, nie tylko 8 liści z próbnymi tackami. Deterministyczne, bez próbkowania.\nDowód (lokalny wskaźnik, 48 partii, limit 500, nie ocena), przegranych: dead 0/5/15/40/100/250 ->\n29/29/26/26/27/27. Zysk mały i w granicach szumu; koszt ok. 2x czas (ok. 35 ms/postawienie).\nRyzyko: limit czasu oceny (3.1 było ok. 15 ms).\n\nCo dalej: zrobione (ten commit). Następny krok: po ocenie, jeśli za wolno, zmniejszyć BEAM do 60;\njeśli zysk, ważyć typy rozkładem i dodać parę typów. Nie powtarzać: dead>40, FINAL/SAMPLES w górę.\n\nCo-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+ ],
  "koszt": {
-  "tury": 0,
-  "usd": 0.0,
-  "minuty": 0.0
+  "tury": 18,
+  "usd": 0.2694,
+  "minuty": 15.7
  },
  "oczekiwanie_min": 0.0,
  "kontynuacje_tur": 0,
- "sesje": []
+ "sesje": [
+  {
+   "start": "2026-10-10T02:21:15Z",
+   "koniec": "2026-10-10T02:36:54Z",
+   "tury": 18,
+   "przyczyna": "terminal_reason=completed"
+  }
+ ]
 }
