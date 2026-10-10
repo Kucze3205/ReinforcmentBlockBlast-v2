@@ -2,16 +2,25 @@
  "rodzic": "korzen",
  "rodzic_sha": "caf8e7251570b57ad4a6ebb26f3b0b13e8326fcc",
  "kolejnosc": 1,
- "sha": "caf8e7251570b57ad4a6ebb26f3b0b13e8326fcc",
- "stan": "sesja",
- "gist": "",
- "notatki": [],
+ "sha": "4002325a1b856555da0be430f08de21281ad8c89",
+ "stan": "ocena w toku",
+ "gist": "Dodaj policies.build: wiązka po tacce (bitboardy) z ryzykiem trudnych tacek",
+ "notatki": [
+  "Dodaj policies.build: wiązka po tacce (bitboardy) z ryzykiem trudnych tacek\n\nMechanizm: SurvivalPolicy (survival.py) planuje całą tackę (permutacje, wiązka 100),\nliście oceniane: ryzyko niegrywalnej następnej tacki (12 próbek + 35 multizbiorów\ntrudnych typów, hard=400, wagi 1/3/6, losowane co ruch), kara za kruche typy (frag 15),\ntanie cechy (zapełnienie 8, izolowane dziury 25, przejścia 4). Ryzyko liczone tylko dla 40\nnajlepszych kandydatów wg taniej oceny.\nDowód z historii: przepis z 4.2/1.4 drzewa 3 (0.925-0.928); kodu na gałęzi nie było\n(policies.build nie istniał), więc odbudowa od zera, nie kopia - wagi tanie inne.\nLokalnie tylko dym: 4 partie x 300 ruchów bez wywrotki i bez przegranej, ok. 30 ms/ruch\n(wolniej niż ok. 10 ms z historii - limit czasu oceny nieznany). Wyniku nie mierzyłem.\nPierwsza wersja (fill 3, trans 2) umierała ok. ruchu 230 w 3 z 4 partii; podniosłem wagi.\nRyzyko: czas ruchu; wagi nieostrojone.\n\nCo dalej: zrobione (ten commit). Następny krok po ocenie: jeśli za wolno, risk_cands 40 -> 20;\njeśli przegrane, zmienić wagi cheap/hard_w. Nie powtarzać: kopiowania wagi z dead/hard=1000.\n\nCo-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+ ],
  "koszt": {
-  "tury": 0,
-  "usd": 0.0,
-  "minuty": 0.0
+  "tury": 29,
+  "usd": 0.52,
+  "minuty": 9.8
  },
  "oczekiwanie_min": 0.0,
  "kontynuacje_tur": 0,
- "sesje": []
+ "sesje": [
+  {
+   "start": "2026-10-10T08:26:56Z",
+   "koniec": "2026-10-10T08:36:44Z",
+   "tury": 29,
+   "przyczyna": "terminal_reason=completed"
+  }
+ ]
 }
