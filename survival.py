@@ -27,10 +27,10 @@ for _p in PIECE_POOL:
     PLACE.append(_lst)
 
 HARD_TYPES = [3, 4, 7, 6, 10]  # belka4, belka5, kwadrat3, prostokąt 2x3, narożnik5
-HARD_TRIPLES = [
-    (c, len(set(itertools.permutations(c))) / 125.0)
-    for c in itertools.combinations_with_replacement(range(len(HARD_TYPES)), 3)
-]
+HARD_TRIPLES = []
+for _c in itertools.combinations_with_replacement(range(len(HARD_TYPES)), 3):
+    _slots = tuple(_c[:_j].count(_c[_j]) for _j in range(3))
+    HARD_TRIPLES.append((_c, _slots, len(set(itertools.permutations(_c))) / 125.0))
 
 BEAM = 40
 FINAL = 8
@@ -171,7 +171,7 @@ class SurvivalPolicy:
         if not states[0][3]:
             return None, None
         final = FINAL_TIGHT if 64 - _pop(b) <= 22 else FINAL
-        hard = [self.rng.choice(PIECE_TYPES[t]) for t in HARD_TYPES]
+        hard = [[self.rng.choice(PIECE_TYPES[t]) for _ in range(3)] for t in HARD_TYPES]
         best, best_s = None, None
         for brd, lines, _rem, seq, bs in states[:final]:
             sc = self._leaf(brd, lines, hard)
@@ -182,8 +182,8 @@ class SurvivalPolicy:
     def _leaf(self, b, lines, hard):
         mean_fit, dead = fit_stats(b)
         bad = 0.0
-        for c, w in HARD_TRIPLES:
-            if not tray_ok(b, [hard[i] for i in c]):
+        for c, slots, w in HARD_TRIPLES:
+            if not tray_ok(b, [hard[i][s] for i, s in zip(c, slots)]):
                 bad += w
         return (cheap(b) + LINE_W * lines - RISK_W * (1.0 - mean_fit) ** 3
                 - FIT_W * (1.0 - mean_fit) - DEAD_W * dead - HARD_W * bad)
