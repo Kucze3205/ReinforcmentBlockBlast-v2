@@ -1,0 +1,17 @@
+{
+ "rodzic": "4.3",
+ "rodzic_sha": "4ca7c577a3da45c04355f189bdb6cb3ec4f216e9",
+ "kolejnosc": 16,
+ "sha": "4ca7c577a3da45c04355f189bdb6cb3ec4f216e9",
+ "stan": "sesja",
+ "gist": "",
+ "notatki": [],
+ "koszt": {
+  "tury": 0,
+  "usd": 0.0,
+  "minuty": 0.0
+ },
+ "oczekiwanie_min": 0.0,
+ "kontynuacje_tur": 0,
+ "sesje": []
+}
