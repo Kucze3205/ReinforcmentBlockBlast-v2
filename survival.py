@@ -107,7 +107,9 @@ HARD = (7, 9, 4, 6, 12)    # 3x3, duże L, 1x5, 2x3, przekątna 3
 class SurvivalPolicy:
     name = "survival"
 
-    def __init__(self, beam=100, final=10, final_crowded=24, trays=12, risk_w=60.0, hard_w=400.0, trays_crowded=36):
+    def __init__(self, beam=100, final=10, final_crowded=24, trays=12, risk_w=60.0, hard_w=400.0, trays_crowded=36,
+                 la_from=44, la_top=4, la_trays=6, la_w=0.5):
+        self.la_from, self.la_top, self.la_trays, self.la_w = la_from, la_top, la_trays, la_w
         self.trays_crowded = trays_crowded
         self.beam, self.final, self.final_crowded = beam, final, final_crowded
         self.trays, self.risk_w, self.hard_w = trays, risk_w, hard_w
@@ -137,6 +139,35 @@ class SurvivalPolicy:
     def _hard_risk(self, b):
         bad = sum(w for w, ps in self.hard if not playable(b, ps))
         return bad / 125.0
+
+    def _after_tray(self, b, ps, width=6):
+        """Najlepsza (wg cheap) plansza po postawieniu całej tacki ps; None, gdy się nie da."""
+        level = {(b, (1 << len(ps)) - 1): 0}
+        for _ in ps:
+            nxt = {}
+            for (bd, rem) in level:
+                for k, p in enumerate(ps):
+                    if not rem >> k & 1:
+                        continue
+                    for m in BARE[p]:
+                        if not m & bd:
+                            nb = clear(bd | m)
+                            key = (nb, rem ^ (1 << k))
+                            if key not in nxt:
+                                nxt[key] = cheap(nb)
+            if not nxt:
+                return None
+            level = dict(sorted(nxt.items(), key=lambda kv: -kv[1])[:width]) if len(nxt) > width else nxt
+        return max(level.values())
+
+    def _lookahead(self, b, n):
+        """Średnia ocena najlepszej planszy po następnej tacce (niegrywalne próbki = kara)."""
+        rng, tot = self.rng, 0.0
+        for _ in range(n):
+            ps = [rng.choice(PIECE_TYPES[rng.randrange(15)]) for _ in range(3)]
+            v = self._after_tray(b, ps)
+            tot += -300.0 if v is None else v
+        return tot / n
 
     def act(self, game, actions):
         self._new_hard()
@@ -178,9 +209,12 @@ class SurvivalPolicy:
         crowded = b.bit_count() > 40
         top = leaves[: self.final_crowded if crowded else self.final]
         ntr = self.trays_crowded if crowded else self.trays
-        best, best_s = None, None
+        scored = []
         for (bd, _), (sc, first) in top:
             s = sc - self.risk_w * self._risk(bd, ntr) - self.hard_w * self._hard_risk(bd)
-            if best_s is None or s > best_s:
-                best, best_s = first, s
-        return tuple(best)
+            scored.append((s, bd, first))
+        scored.sort(key=lambda t: -t[0])
+        if b.bit_count() > self.la_from:
+            scored = [(s + self.la_w * self._lookahead(bd, self.la_trays), bd, f) for s, bd, f in scored[: self.la_top]]
+            scored.sort(key=lambda t: -t[0])
+        return tuple(scored[0][2])
