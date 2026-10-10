@@ -9,7 +9,7 @@ import random
 from functools import lru_cache
 from itertools import permutations
 
-from pieces import PIECE_POOL
+from pieces import PIECE_POOL, PIECE_TYPES
 
 FULL = (1 << 64) - 1
 ROWS = [0xFF << (8 * r) for r in range(8)]
@@ -28,10 +28,12 @@ for _p in PIECE_POOL:
     ])
 NPOSE = len(PLACE)
 
-W = {"trans": 3.0, "isolated": 2.0, "fit": 6.0, "fill": 0.5, "risk": 300.0}
+W = {"trans": 3.0, "isolated": 2.0, "fit": 1.5, "fill": 0.5, "risk": 300.0, "dead": 300.0, "own": 0.5, "clear": 5.0, "sq": 0.0, "near": 0.0, "bonus": 400.0}
 BEAM = 24
+FITCAP = 3
 TOP = 4
-SAMPLES = 8
+SAMPLES = 6
+LBEAM = 6
 
 
 def pop(x):
@@ -40,10 +42,12 @@ def pop(x):
 
 def clear(b):
     full = 0
+    n = 0
     for m in LINES:
         if b & m == m:
             full |= m
-    return b & ~full, full != 0
+            n += 1
+    return b & ~full, n
 
 
 ERODE = []  # (przesunięcia komórek, maska poprawnych kotwic) dla każdej pozy
@@ -64,7 +68,7 @@ def fits(b):
             if not r:
                 break
         if r:
-            n += 1
+            n += min(pop(r), FITCAP)
     return n
 
 
@@ -78,7 +82,13 @@ def cheap(b):
     around = (((b << 1) & FULL) | EDGE_L) & ((b >> 1) | EDGE_R) \
         & (((b << 8) & FULL) | ROWS[0]) & ((b >> 8) | ROWS[7])
     iso = pop(~b & around & FULL)
-    return -(W["trans"] * trans + W["isolated"] * iso + W["fill"] * pop(b))
+    sq = near = 0
+    for m in LINES:
+        c = pop(b & m)
+        sq += c * c
+        near += c >= 6
+    return -(W["trans"] * trans + W["isolated"] * iso + W["fill"] * pop(b)) \
+        + W["sq"] * sq + W["near"] * near
 
 
 @lru_cache(maxsize=1 << 20)
@@ -113,7 +123,7 @@ def search(b, poses, beam=BEAM):
                         continue
                     nb, cl = clear(sb | m)
                     f = first if first is not None else (k, px, py)
-                    gain = bonus + (5.0 if cl else 0.0) + (400.0 if nb == 0 else 0.0)
+                    gain = bonus + W["clear"] * cl + (W["bonus"] if nb == 0 else 0.0)
                     key = (nb, f)
                     if key not in nxt or nxt[key][1] < gain:
                         nxt[key] = (nb, gain, f)
@@ -122,7 +132,7 @@ def search(b, poses, beam=BEAM):
                 break
             states = list(nxt.values())
             if len(states) > beam:
-                states.sort(key=lambda s: cheap(s[0]) + s[1], reverse=True)
+                states.sort(key=lambda s: evaluate(s[0]) + s[1], reverse=True)
                 states = states[:beam]
         for sb, bonus, first in states:
             v = evaluate(sb) + bonus
@@ -137,13 +147,16 @@ class SurvivalPolicy:
     def reset(self, game_seed):
         self.rng = random.Random(f"surv:{game_seed}")
 
-    def risk(self, b):
-        dead = 0
+    def tray(self):
+        return [self.rng.choice(PIECE_TYPES[self.rng.randrange(len(PIECE_TYPES))]) for _ in range(3)]
+
+    def look(self, b):
+        """Średnia ocena najlepszego ułożenia próbnych następnych tacek; martwa tacka = -DEAD."""
+        tot = 0.0
         for _ in range(SAMPLES):
-            tray = [self.rng.randrange(NPOSE) for _ in range(3)]
-            if not playable(b, tuple(tray)):
-                dead += 1
-        return dead / SAMPLES
+            res = search(b, self.tray(), beam=LBEAM)
+            tot += max(r[0] for r in res) if res else -W["dead"]
+        return tot / SAMPLES
 
     def act(self, game, actions):
         b = 0
@@ -161,7 +174,7 @@ class SurvivalPolicy:
         leaves.sort(key=lambda t: t[0], reverse=True)
         leaves = leaves[:TOP]
         if len(leaves) > 1:
-            leaves = [(v - W["risk"] * self.risk(sb), f, sb) for v, f, sb in leaves]
+            leaves = [(W["own"] * v + self.look(sb), f, sb) for v, f, sb in leaves]
             leaves.sort(key=lambda t: t[0], reverse=True)
         k, px, py = leaves[0][1]
         return (slot[k], px, py)
