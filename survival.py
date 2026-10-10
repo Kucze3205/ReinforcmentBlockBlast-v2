@@ -17,7 +17,7 @@ _LOW56 = (1 << 56) - 1
 
 BEAM = 100
 FINAL = 8          # tyle liści dostaje drogą ocenę (fit + ryzyko następnej tacki)
-SAMPLES = 12       # próbne tacki do oceny ryzyka
+SAMPLES = 24      # próbne tacki do oceny ryzyka
 W = {"empty": 1.0, "iso": 4.0, "trans": 3.0, "fit": 1.5, "risk": 300.0, "lines": 2.0, "zero": 5.0}
 
 
