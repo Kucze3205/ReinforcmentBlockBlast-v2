@@ -25,6 +25,7 @@ for _p in PIECE_POOL:
 
 # typy trudne: belka4, belka5, prostokąt 2x3, kwadrat3, narożnik5
 HARD_TYPES = [3, 4, 6, 7, 10]
+PIECE_CELLS = [sum(sum(row) for row in p.shape) for p in PIECE_POOL]
 
 
 def popcount(x):
@@ -201,6 +202,12 @@ class SearchPolicy:
                 bad += 1
         return risk + self.risk_w * 2 * bad / self.samples
 
+    def _beam_key(self, kv, idxs, pieces):
+        (nb, used), (_, ln) = kv
+        # odejmujemy rozmiar postawionych klocków: porównujemy plansze, nie ich rozmiar
+        placed = sum(PIECE_CELLS[pieces[i]] for i in idxs if used >> i & 1)
+        return shape_penalty(nb, self.w) - self.w[0] * placed - self.lw * ln
+
     def act(self, game, actions):
         rnd = self.rng
         self._hard_trays = [([rnd.choice(PIECE_TYPES[a]), rnd.choice(PIECE_TYPES[c]),
@@ -239,8 +246,7 @@ class SearchPolicy:
                 if not moved and fa is not None:
                     stuck.append((shape_penalty(b, w) + 1000 - self.lw * ln, fa))
             if len(nxt) > self.beam:
-                keyed = sorted(nxt.items(),
-                               key=lambda kv: shape_penalty(kv[0][0], w) - self.lw * kv[1][1])
+                keyed = sorted(nxt.items(), key=lambda kv: self._beam_key(kv, idxs, pieces))
                 nxt = dict(keyed[:self.beam])
             level = nxt
         scored = sorted(((shape_penalty(b, w) - self.lw * ln, b, fa)
