@@ -12,7 +12,9 @@ import survival
 
 for kv in (sys.argv[3].split(",") if len(sys.argv) > 3 else []):
     k, v = kv.split("=")
-    if k in ("BEAM", "FINAL", "SAMPLES"):
+    if k == "HT":
+        survival.HARD_TYPES = tuple(int(t) for t in v.split("+"))
+    elif k in ("BEAM", "FINAL", "SAMPLES"):
         setattr(survival, k, int(v))
     else:
         survival.W[k] = float(v)

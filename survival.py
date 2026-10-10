@@ -113,8 +113,9 @@ class SurvivalPolicy:
         self.rng = random.Random(f"surv:{game_seed}")
         self.samples = [[self._rand_pose() for _ in range(3)] for _ in range(SAMPLES)]
         hard = [self.rng.choice(PIECE_TYPES[t]) for t in HARD_TYPES]
-        self.hard = [[hard[i], hard[j], hard[k]] for i in range(5)
-                     for j in range(i, 5) for k in range(j, 5)]
+        n = len(HARD_TYPES)
+        self.hard = [[hard[i], hard[j], hard[k]] for i in range(n)
+                     for j in range(i, n) for k in range(j, n)]
 
     def _rand_pose(self):
         return self.rng.choice(self.rng.choice(PIECE_TYPES))
