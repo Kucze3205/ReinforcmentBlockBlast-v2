@@ -17,6 +17,8 @@ _LOW56 = (1 << 56) - 1
 
 BEAM = 100
 FINAL = 8          # tyle liści dostaje drogą ocenę (fit + ryzyko następnej tacki)
+CROWD = 22         # przy tylu wolnych polach lub mniej oceniamy FINAL_CROWD liści
+FINAL_CROWD = 20
 SAMPLES = 12       # próbne tacki do oceny ryzyka
 W = {"empty": 1.0, "iso": 4.0, "trans": 3.0, "fit": 1.5, "risk": 300.0, "lines": 2.0, "dead": 0.0, "zero": 5.0, "hard": 400.0}
 HARD_TYPES = (7, 10, 4, 6, 12)   # indeksy w PIECE_TYPES: 3x3, duże L, 1x5, 2x3, przekątna 3
@@ -180,7 +182,8 @@ class SurvivalPolicy:
         cand = [(sc, b, first) for (b, _), (sc, first, _) in level.items()]
         cand.sort(key=lambda t: -t[0])
         best, best_v = None, None
-        for sc, b, first in cand[:FINAL]:
+        nfinal = FINAL_CROWD if 64 - b0.bit_count() <= CROWD else FINAL
+        for sc, b, first in cand[:nfinal]:
             v = sc + _fit_score(b)
             bad = sum(1 for s in self.samples if not _playable(b, s))
             v -= W["risk"] * bad / len(self.samples)
