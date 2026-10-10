@@ -15,10 +15,10 @@ _COL7 = _COL0 << 7
 _ROW0 = 0xFF
 _LOW56 = (1 << 56) - 1
 
-BEAM = 70
+BEAM = 100
 FINAL = 8          # tyle liści dostaje drogą ocenę (fit + ryzyko następnej tacki)
-SAMPLES = 24       # próbne tacki do oceny ryzyka
-W = {"empty": 1.0, "iso": 4.0, "trans": 3.0, "fit": 1.5, "risk": 300.0, "lines": 2.0, "dead": 40.0, "zero": 5.0, "hard": 400.0}
+SAMPLES = 12       # próbne tacki do oceny ryzyka
+W = {"empty": 1.0, "iso": 4.0, "trans": 3.0, "fit": 1.5, "risk": 300.0, "lines": 2.0, "dead": 0.0, "zero": 5.0, "hard": 400.0}
 HARD_TYPES = (7, 10, 4, 6, 12)   # indeksy w PIECE_TYPES: 3x3, duże L, 1x5, 2x3, przekątna 3
 
 
@@ -134,6 +134,9 @@ class SurvivalPolicy:
     def reset(self, game_seed):
         self.rng = random.Random(f"surv:{game_seed}")
         self.samples = [[self._rand_pose() for _ in range(3)] for _ in range(SAMPLES)]
+        self._new_hard()
+
+    def _new_hard(self):
         hard = [self.rng.choice(PIECE_TYPES[t]) for t in HARD_TYPES]
         self.hard = [[hard[i], hard[j], hard[k]] for i in range(5)
                      for j in range(i, 5) for k in range(j, 5)]
@@ -144,6 +147,7 @@ class SurvivalPolicy:
     def act(self, game, actions):
         if len(actions) == 1:
             return actions[0]
+        self._new_hard()
         b0 = 0
         for y, row in enumerate(game.board.grid):
             for x, c in enumerate(row):
