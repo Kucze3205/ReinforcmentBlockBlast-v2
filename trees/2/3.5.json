@@ -2,16 +2,25 @@
  "rodzic": "3.4",
  "rodzic_sha": "e6731847fdb833b91486f733ee3b75274dca7b91",
  "kolejnosc": 19,
- "sha": "e6731847fdb833b91486f733ee3b75274dca7b91",
- "stan": "sesja",
- "gist": "",
- "notatki": [],
+ "sha": "7f08c8201da25c0a04d933f6c8a05f3037985807",
+ "stan": "ocena w toku",
+ "gist": "Hard-tacki losowane na nowo przy każdym ruchu (wszystkie obroty trudnych typów), baza 4.4",
+ "notatki": [
+  "Hard-tacki losowane na nowo przy każdym ruchu (wszystkie obroty trudnych typów), baza 4.4\n\nMechanizm: dotąd zestaw 35 trudnych tacek (hard=400) był losowany raz na partię, więc ocena\nwidziała jeden obrót każdego z 5 typów. Teraz _new_hard() w act() losuje obroty przy każdym ruchu,\nwięc kara uśrednia po obrotach w czasie. Reszta wg 4.4 (0.925, najlepszy): BEAM 100, SAMPLES 12,\ndead=0 (3.4 z dead 0.921 vs 4.4 bez 0.925 - w szumie, dead kosztuje czas).\nNie powtórka: 2.4 parametryzowało zbiór typów, nikt nie zmieniał obrotów w czasie.\nLokalnie (nie ocena): smoke 500 / 24 partie bez wywrotki, 11 przegranych, ~99 s.\nRyzyko: szum w ocenie ruchu może pogorszyć spójność wyboru.\n\nCo dalej: zrobione (ten commit). Następny krok: po ocenie, jeśli gorzej niż 0.925, wrócić do stałego\nzestawu. Nie powtarzać: dead w _cheap, hard=1000, FINAL/SAMPLES w górę.\n\nCo-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+ ],
  "koszt": {
-  "tury": 0,
-  "usd": 0.0,
-  "minuty": 0.0
+  "tury": 10,
+  "usd": 0.1563,
+  "minuty": 3.0
  },
  "oczekiwanie_min": 0.0,
  "kontynuacje_tur": 0,
- "sesje": []
+ "sesje": [
+  {
+   "start": "2026-10-10T04:19:37Z",
+   "koniec": "2026-10-10T04:22:39Z",
+   "tury": 10,
+   "przyczyna": "terminal_reason=completed"
+  }
+ ]
 }
