@@ -59,9 +59,8 @@ class ModelPolicy:
 
 
 def build(weights=None):
-    """Wejście oceny: polityka przeżycia (wagi niepotrzebne)."""
+    """Punkt wejścia oceny: polityka z reset(seed) i act(game, actions)."""
     from survival import SurvivalPolicy
-
     return SurvivalPolicy()
 
 

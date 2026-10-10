@@ -101,29 +101,44 @@ def playable(b, ps, budget=1500):
     return rec(b, (1 << len(ps)) - 1)
 
 
+HARD = (7, 9, 4, 6, 12)    # 3x3, duże L, 1x5, 2x3, przekątna 3
+
+
 class SurvivalPolicy:
     name = "survival"
 
-    def __init__(self, beam=40, final=10, final_crowded=24, trays=60, risk_w=60.0):
+    def __init__(self, beam=100, final=10, final_crowded=24, trays=12, risk_w=60.0, hard_w=400.0):
         self.beam, self.final, self.final_crowded = beam, final, final_crowded
-        self.trays, self.risk_w = trays, risk_w
+        self.trays, self.risk_w, self.hard_w = trays, risk_w, hard_w
 
     def reset(self, game_seed):
         self.rng = random.Random(f"surv:{game_seed}")
 
-    def _sample(self):
-        rng = self.rng
-        return [[rng.choice(PIECE_TYPES[rng.randrange(15)]) for _ in range(3)]
-                for _ in range(self.trays)]
-
-    def _risk(self, b, trays):
-        bad = 0
-        for ps in trays:
+    def _risk(self, b):
+        rng, bad = self.rng, 0
+        for _ in range(self.trays):
+            ps = [rng.choice(PIECE_TYPES[rng.randrange(15)]) for _ in range(3)]
             if not playable(b, ps):
                 bad += 1
-        return bad / len(trays)
+        return bad / self.trays
+
+    def _new_hard(self):
+        """Trójki trudnych typów z wagą = liczba uporządkowań (1/3/6 z 125); obroty losowane przy każdym ruchu."""
+        rng, out = self.rng, []
+        for i, a in enumerate(HARD):
+            for j in range(i, len(HARD)):
+                for k in range(j, len(HARD)):
+                    n = len({i, j, k})
+                    w = 6 if n == 3 else 3 if n == 2 else 1
+                    out.append((w, [rng.choice(PIECE_TYPES[HARD[t]]) for t in (i, j, k)]))
+        self.hard = out
+
+    def _hard_risk(self, b):
+        bad = sum(w for w, ps in self.hard if not playable(b, ps))
+        return bad / 125.0
 
     def act(self, game, actions):
+        self._new_hard()
         grid = game.board.grid
         b = 0
         for r in range(8):
@@ -161,11 +176,9 @@ class SurvivalPolicy:
         leaves.sort(key=lambda kv: -kv[1][0])
         crowded = b.bit_count() > 40
         top = leaves[: self.final_crowded if crowded else self.final]
-        # wspólne próbne tacki dla wszystkich liści: porównanie bez szumu losowania
-        trays = self._sample()
         best, best_s = None, None
         for (bd, _), (sc, first) in top:
-            s = sc - self.risk_w * self._risk(bd, trays)
+            s = sc - self.risk_w * self._risk(bd) - self.hard_w * self._hard_risk(bd)
             if best_s is None or s > best_s:
                 best, best_s = first, s
         return tuple(best)
