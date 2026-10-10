@@ -15,10 +15,10 @@ _COL7 = _COL0 << 7
 _ROW0 = 0xFF
 _LOW56 = (1 << 56) - 1
 
-BEAM = 100
+BEAM = 70
 FINAL = 8          # tyle liści dostaje drogą ocenę (fit + ryzyko następnej tacki)
-SAMPLES = 12       # próbne tacki do oceny ryzyka
-W = {"empty": 1.0, "iso": 4.0, "trans": 3.0, "fit": 1.5, "risk": 300.0, "lines": 2.0, "dead": 40.0}
+SAMPLES = 24       # próbne tacki do oceny ryzyka
+W = {"empty": 1.0, "iso": 4.0, "trans": 3.0, "fit": 1.5, "risk": 300.0, "lines": 2.0, "dead": 40.0, "zero": 5.0}
 
 
 def _pose_masks():
@@ -96,7 +96,15 @@ def _fits(b, pose, cap=3):
 
 
 def _fit_score(b):
-    return W["fit"] * sum(_fits(b, i) for i in range(len(PIECE_POOL))) / 3.0
+    tot = 0.0
+    for t in PIECE_TYPES:
+        n = 0
+        for i in t:
+            n += _fits(b, i, 4)
+            if n >= 4:
+                break
+        tot += W["fit"] * min(n, 4) / 2.0 if n else -W["zero"]
+    return tot
 
 
 def _playable(b, poses):
