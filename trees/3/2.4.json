@@ -2,16 +2,25 @@
  "rodzic": "2.3",
  "rodzic_sha": "2bc4c337274e2f7e206582d6cfa397a4648d8533",
  "kolejnosc": 14,
- "sha": "2bc4c337274e2f7e206582d6cfa397a4648d8533",
- "stan": "sesja",
- "gist": "",
- "notatki": [],
+ "sha": "7984a1582889c79b56fd6bc221d729526913c952",
+ "stan": "ocena w toku",
+ "gist": "Ryzyko dwie tacki w przód: kara risk2 przy zapełnionej planszy (>30 pól)",
+ "notatki": [
+  "Ryzyko dwie tacki w przód: kara risk2 przy zapełnionej planszy (>30 pól)\n\nMechanizm: dla topowych liści przy zapełnionej planszy (bity > 30) bierzemy 6 próbnych tacek,\nwyliczamy plansze po każdym możliwym postawieniu całej tacki (DFS po kolejnościach), 6 najlepszych\nwg cheap sprawdzamy 4 wspólnymi tackami kolejnego rzędu (playable, budżet 400). Kara 120 * odsetek tacek,\npo których każde postawienie zostawia ryzykowną planszę. Baza: 2.3 (kod 4.2 z CRN, 0.922).\nDowód z historii: drzewo 3 stoi na 0.925 mimo zmian szerokości (final_crowded 48 w 3.3, trays 36 w 4.3,\nbez zysku), więc szerokość i szum nie są ograniczeniem; ocena widzi tylko jedną tacką w przód.\nNie powtórka: nowy mechanizm (głębokość 2 tacek), nie parametry. Sprawdzone tylko, że działa\n(3 partie x 300 ruchów, ok. 8-25 ms/ruch; testy przechodzą poza tkinter); wyniku nie mierzyłem.\nRyzyko: wagi 120/30 niedostrojone; wspólna próbka 4 tacek jest mała.\n\nCo dalej: zrobione (ten commit). Następny krok: po ocenie; jeśli gorzej, risk2_w=0 wyłącza.\nPomysły: wyższe n2/n3, crowd2. Nie powtarzać: samego podnoszenia trays/final_crowded.\n\nCo-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+ ],
  "koszt": {
-  "tury": 0,
-  "usd": 0.0,
-  "minuty": 0.0
+  "tury": 22,
+  "usd": 0.2951,
+  "minuty": 2.6
  },
  "oczekiwanie_min": 0.0,
  "kontynuacje_tur": 0,
- "sesje": []
+ "sesje": [
+  {
+   "start": "2026-10-10T07:24:24Z",
+   "koniec": "2026-10-10T07:27:01Z",
+   "tury": 22,
+   "przyczyna": "terminal_reason=completed"
+  }
+ ]
 }
