@@ -31,6 +31,7 @@ def _pose_placements(piece):
     return out
 
 
+_SQ3 = None
 _PLACEMENTS = [_pose_placements(p) for p in PIECE_POOL]
 
 
@@ -95,8 +96,23 @@ def _eval(board):
         for r in range(8):
             v |= ((board >> (8 * r + c)) & 1) << r
         trans += bin((v ^ (v >> 1)) & 0x7F).count("1")
-    dead = sum(1 for t in range(15) if not _type_playable(board, t))
-    return filled * 1.0 + iso * 6.0 + trans * 0.8 + dead * 40.0
+    fit = 0
+    for t in range(15):
+        n = 0
+        for pose in PIECE_TYPES[t]:
+            for m, _, _ in _PLACEMENTS[pose]:
+                if not board & m:
+                    n += 1
+                    if n >= 4:
+                        break
+            if n >= 4:
+                break
+        fit += n if n else -5 * 8
+    sq = 0
+    for m, _, _ in _SQ3:
+        if not board & m:
+            sq += 1
+    return filled * 1.0 + iso * 6.0 + trans * 0.8 - fit * 0.6 - min(sq, 8) * 3.0
 
 
 def _hard_trays(hard):
@@ -110,12 +126,13 @@ def _hard_trays(hard):
     return out
 
 
+_SQ3 = _PLACEMENTS[[p.index for p in PIECE_POOL if len(p.shape) == 3 and len(p.shape[0]) == 3 and all(all(r) for r in p.shape)][0]]
 _HARD_TRAYS = _hard_trays((3, 4, 6, 7, 10))
 
 
 class SurvivalPolicy:
     name = "survival"
-    BEAM = 60
+    BEAM = 100
     FINAL = 10
     HARD = (3, 4, 6, 7, 10)  # beam4, beam5, rect23, square3, corner5
     RISK_W = 400.0
