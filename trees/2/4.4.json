@@ -2,16 +2,25 @@
  "rodzic": "4.3",
  "rodzic_sha": "e3dc2ecbea54875235d63b37eb73e3e9b82504ca",
  "kolejnosc": 16,
- "sha": "e3dc2ecbea54875235d63b37eb73e3e9b82504ca",
- "stan": "sesja",
- "gist": "",
- "notatki": [],
+ "sha": "f0f02effc5caf3a67a05b06f159bcb34c003d8df",
+ "stan": "ocena w toku",
+ "gist": "Kombinacja: ryzyko trudnych tacek (hard=400, z 2.3) + fit po typach (4.2), SAMPLES 24 -> 12",
+ "notatki": [
+  "Kombinacja: ryzyko trudnych tacek (hard=400, z 2.3) + fit po typach (4.2), SAMPLES 24 -> 12\n\nMechanizm: do oceny FINAL liści dodana kara 400*odsetek niegrywalnych z 35 tacek złożonych z 5 najtrudniejszych\ntypów (3x3, duże L, 1x5, 2x3, przekątna 3), DFS _playable; port z łańcucha 2 (2.3, 0.908, .historia/2/2.patch).\nBazą pozostaje kod 4.2 (fit po typach zero=5, BEAM 100).\nDowód z historii: 2.3 (hard 400) 0.908 vs 2.2 0.874; 4.2/4.3 stoją na 0.885 przy drobnych poprawkach cech.\nNie powtórka: hard nigdy nie był łączony z fitem po typach; łańcuch 4 nie miał tego mechanizmu.\nSAMPLES 24->12 (jak w 2.3), by zmieścić czas: DFS trudnych tacek ~2.4x wolniej wg 2.3.\nRyzyko: czas oceny (limit 60 min; 4.1 przekroczył), działanie sprawdzone tylko jedną krótką partią, wyniku nie mierzyłem.\n\nCo dalej: zrobione - ten commit. Następny krok: po ocenie sprawdzić czas i wynik; jeśli za wolno, BEAM 100->70 lub FINAL 8->6. Nie powtarzać: dead w _cheap, hard=1000, deadrem.\n\nCo-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+ ],
  "koszt": {
-  "tury": 0,
-  "usd": 0.0,
-  "minuty": 0.0
+  "tury": 17,
+  "usd": 0.2115,
+  "minuty": 1.4
  },
  "oczekiwanie_min": 0.0,
  "kontynuacje_tur": 0,
- "sesje": []
+ "sesje": [
+  {
+   "start": "2026-10-10T03:34:45Z",
+   "koniec": "2026-10-10T03:36:06Z",
+   "tury": 17,
+   "przyczyna": "terminal_reason=completed"
+  }
+ ]
 }
