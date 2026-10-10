@@ -107,7 +107,8 @@ HARD = (7, 9, 4, 6, 12)    # 3x3, duże L, 1x5, 2x3, przekątna 3
 class SurvivalPolicy:
     name = "survival"
 
-    def __init__(self, beam=100, final=10, final_crowded=24, trays=12, risk_w=60.0, hard_w=400.0):
+    def __init__(self, beam=100, final=10, final_crowded=24, trays=12, risk_w=60.0, hard_w=400.0, frag_w=15.0):
+        self.frag_w = frag_w
         self.beam, self.final, self.final_crowded = beam, final, final_crowded
         self.trays, self.risk_w, self.hard_w = trays, risk_w, hard_w
 
@@ -132,6 +133,22 @@ class SurvivalPolicy:
                     w = 6 if n == 3 else 3 if n == 2 else 1
                     out.append((w, [rng.choice(PIECE_TYPES[HARD[t]]) for t in (i, j, k)]))
         self.hard = out
+
+    def _frag(self, b):
+        """Kara za typy klocków z 0 lub 1 położeniem (kruche): 0 -> 2, 1 -> 1."""
+        k = 0
+        for t in range(15):
+            n = 0
+            for p in PIECE_TYPES[t]:
+                for m in BARE[p]:
+                    if not m & b:
+                        n += 1
+                        if n > 1:
+                            break
+                if n > 1:
+                    break
+            k += 2 - n if n < 2 else 0
+        return k
 
     def _hard_risk(self, b):
         bad = sum(w for w, ps in self.hard if not playable(b, ps))
@@ -178,7 +195,7 @@ class SurvivalPolicy:
         top = leaves[: self.final_crowded if crowded else self.final]
         best, best_s = None, None
         for (bd, _), (sc, first) in top:
-            s = sc - self.risk_w * self._risk(bd) - self.hard_w * self._hard_risk(bd)
+            s = sc - self.risk_w * self._risk(bd) - self.hard_w * self._hard_risk(bd) - self.frag_w * self._frag(bd)
             if best_s is None or s > best_s:
                 best, best_s = first, s
         return tuple(best)
