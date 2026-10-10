@@ -2,16 +2,25 @@
  "rodzic": "1.1",
  "rodzic_sha": "01c1832e61bc4487fd8ec32df087a200aa5fe321",
  "kolejnosc": 5,
- "sha": "01c1832e61bc4487fd8ec32df087a200aa5fe321",
- "stan": "sesja",
- "gist": "",
- "notatki": [],
+ "sha": "412b57283ae518e16df8d5ab0bdb4c1b1eca5d4e",
+ "stan": "ocena w toku",
+ "gist": "survival: baza z 4.1 (cheap z kieszeniami/3x3/belkami, DFS) + wspólne próbne tacki dla liści",
+ "notatki": [
+  "survival: baza z 4.1 (cheap z kieszeniami/3x3/belkami, DFS) + wspólne próbne tacki dla liści\n\nMechanizm: wracam do kodu węzła 4.1 (s_sym 0.855, najlepszy zmierzony w drzewie 3; obecna baza\n1.1 miała 0.802 z prostszą oceną planszy). Zmiana względem 4.1: ryzyko wszystkich liści liczone\nna tych samych 60 próbnych tackach (wspólne liczby losowe) zamiast świeżych 40 na liść, więc\nporównanie liści nie jest zaszumione losowaniem.\nNie powtórka: 4.1 podnosiło liczbę próbek, tu zmieniam sposób próbkowania.\nLokalnie tylko smoke (4 partie bez wywrotki, ok. 8 ms/ruch), wyniku nie mierzyłem.\nRyzyko: efekt nieznany do oceny; budżet DFS traktuje przekroczenie jako sukces.\n\nCo dalej: zrobione (ten commit). Następny krok po ocenie: wagi cheap() albo ważenie trudnych\ntacek; nie powtarzać zwiększania samej liczby próbek.\n\nCo-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+ ],
  "koszt": {
-  "tury": 0,
-  "usd": 0.0,
-  "minuty": 0.0
+  "tury": 14,
+  "usd": 0.248,
+  "minuty": 1.9
  },
  "oczekiwanie_min": 0.0,
  "kontynuacje_tur": 0,
- "sesje": []
+ "sesje": [
+  {
+   "start": "2026-10-10T06:42:59Z",
+   "koniec": "2026-10-10T06:44:55Z",
+   "tury": 14,
+   "przyczyna": "terminal_reason=completed"
+  }
+ ]
 }
