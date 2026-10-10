@@ -18,7 +18,7 @@ _LOW56 = (1 << 56) - 1
 BEAM = 100
 FINAL = 8          # tyle liści dostaje drogą ocenę (fit + ryzyko następnej tacki)
 SAMPLES = 12       # próbne tacki do oceny ryzyka
-W = {"empty": 1.0, "iso": 4.0, "trans": 3.0, "fit": 1.5, "risk": 300.0, "lines": 2.0}
+W = {"empty": 1.0, "iso": 4.0, "trans": 3.0, "fit": 1.5, "risk": 300.0, "lines": 2.0, "dead": 40.0}
 
 
 def _pose_masks():
@@ -64,7 +64,25 @@ def _cheap(b):
     down = (b >> 8) | (_ROW0 << 56)
     iso = (e & left & right & up & down).bit_count()
     trans = ((b ^ (b >> 1)) & ~_COL7).bit_count() + ((b ^ (b >> 8)) & _LOW56).bit_count()
-    return W["empty"] * empty - W["iso"] * iso - W["trans"] * trans
+    v = W["empty"] * empty - W["iso"] * iso - W["trans"] * trans
+    if W["dead"]:
+        v -= W["dead"] * _dead_types(b)
+    return v
+
+
+_DEAD = {}
+
+
+def _dead_types(b):
+    """Ile z 15 typów klocków nie ma żadnego położenia na planszy b."""
+    r = _DEAD.get(b)
+    if r is None:
+        r = sum(1 for poses in PIECE_TYPES
+                if not any(not m & b for i in poses for m in _MASK_LISTS[i]))
+        if len(_DEAD) > 200000:
+            _DEAD.clear()
+        _DEAD[b] = r
+    return r
 
 
 def _fits(b, pose, cap=3):
