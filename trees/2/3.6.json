@@ -2,16 +2,25 @@
  "rodzic": "3.5",
  "rodzic_sha": "7f08c8201da25c0a04d933f6c8a05f3037985807",
  "kolejnosc": 22,
- "sha": "7f08c8201da25c0a04d933f6c8a05f3037985807",
- "stan": "sesja",
- "gist": "",
- "notatki": [],
+ "sha": "fc3833b0ba673ea432b5b9711c886e4b9245a58d",
+ "stan": "ocena w toku",
+ "gist": "Adaptacyjne FINAL: 20 liści drogiej oceny przy zapełnionej planszy (<=22 wolnych pól), 8 poza tym",
+ "notatki": [
+  "Adaptacyjne FINAL: 20 liści drogiej oceny przy zapełnionej planszy (<=22 wolnych pól), 8 poza tym\n\nMechanizm: dotąd stałe FINAL=8. Ryzyko śmierci koncentruje się na zapełnionej planszy, tam\ndroga ocena (fit, risk, hard) dostaje 20 liści; na pustej plansze zostaje 8 (tanio).\nDowód: 3.5 (0.934) najlepszy; 4.5 (FINAL 8->10 globalnie) 0.927 w szumie - tu szerokość\ntylko tam, gdzie decyzja jest krytyczna, nie globalnie. Nie powtórka 4.5.\nLokalnie (nie ocena): smoke 500 / 24 partie bez wywrotki, 11 przegranych, ~99 s.\nRyzyko: szum, koszt czasu w końcówkach partii.\n\nCo dalej: zrobione (ten commit). Następny krok: po ocenie, jeśli gorzej niż 0.934, wrócić do 3.5.\nNie powtarzać: globalne FINAL/SAMPLES w górę, dead, hard=1000.\n\nCo-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+ ],
  "koszt": {
-  "tury": 0,
-  "usd": 0.0,
-  "minuty": 0.0
+  "tury": 10,
+  "usd": 0.1386,
+  "minuty": 2.9
  },
  "oczekiwanie_min": 0.0,
  "kontynuacje_tur": 0,
- "sesje": []
+ "sesje": [
+  {
+   "start": "2026-10-10T04:52:41Z",
+   "koniec": "2026-10-10T04:55:32Z",
+   "tury": 10,
+   "przyczyna": "terminal_reason=completed"
+  }
+ ]
 }
