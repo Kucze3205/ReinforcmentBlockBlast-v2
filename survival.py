@@ -13,12 +13,13 @@ _FULL = (1 << 64) - 1
 _COL0 = 0x0101010101010101
 _COL7 = _COL0 << 7
 _ROW0 = 0xFF
+_SQCOL = 0x3F3F3F3F3F3F3F3F
 _LOW56 = (1 << 56) - 1
 
 BEAM = 100
 FINAL = 8          # tyle liści dostaje drogą ocenę (fit + ryzyko następnej tacki)
 SAMPLES = 12       # próbne tacki do oceny ryzyka
-W = {"empty": 1.0, "iso": 4.0, "trans": 3.0, "fit": 1.5, "risk": 300.0, "lines": 2.0}
+W = {"empty": 1.0, "iso": 4.0, "trans": 3.0, "fit": 1.5, "risk": 300.0, "lines": 2.0, "deadrem": 0.0, "sq": 3.0, "sqcap": 8}
 
 
 def _pose_masks():
@@ -64,7 +65,10 @@ def _cheap(b):
     down = (b >> 8) | (_ROW0 << 56)
     iso = (e & left & right & up & down).bit_count()
     trans = ((b ^ (b >> 1)) & ~_COL7).bit_count() + ((b ^ (b >> 8)) & _LOW56).bit_count()
-    return W["empty"] * empty - W["iso"] * iso - W["trans"] * trans
+    r = e & (e >> 1) & (e >> 2) & _SQCOL
+    sq = (r & (r >> 8) & (r >> 16)).bit_count()
+    return (W["empty"] * empty - W["iso"] * iso - W["trans"] * trans
+            + W["sq"] * min(sq, W["sqcap"]))
 
 
 def _fits(b, pose, cap=3):
@@ -137,7 +141,11 @@ class SurvivalPolicy:
                         key = (nb, r2)
                         if key not in nxt:
                             f = first if first is not None else (s, x, y)
-                            nxt[key] = (_cheap(nb) + W["lines"] * (lines + n), f, lines + n)
+                            sc = _cheap(nb) + W["lines"] * (lines + n)
+                            for t in r2:
+                                if not _fits(nb, tray[t], 1):
+                                    sc -= W["deadrem"]
+                            nxt[key] = (sc, f, lines + n)
                 if not moved:
                     dead.append((_cheap(b) - 1e6, b, first))
             if len(nxt) > BEAM:
