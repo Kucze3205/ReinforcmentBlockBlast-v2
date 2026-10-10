@@ -15,8 +15,9 @@ EPS = 0.002       # minimalna poprawa rekordu łańcucha, by liczyła się jako 
 GAP = 0.03        # łańcuch, którego rekord jest o tyle gorszy od najlepszego w drzewie, jest porzucany
 GAP_PER_ROUND = 0.01   # tyle luzu więcej na każdą pozostałą rundę
 NEAR = 0.01       # łańcuch z rekordem w tej odległości od najlepszego nie jest zamykany za zastój
-STOP_DEPTH = 3    # od tej głębokości sprawdzamy, czy drzewo jeszcze się opłaca
-STOP_GAIN = 0.003 # minimalny wzrost rekordu drzewa w ostatniej warstwie, by kontynuować
+STOP_DEPTH = 4    # od tej głębokości sprawdzamy, czy drzewo jeszcze się opłaca
+STOP_GAIN = 0.005 # minimalny wzrost rekordu drzewa w dwóch ostatnich warstwach, by kontynuować
+CLIMB = 0.05      # ostatni skok łańcucha co najmniej tyle: łańcuch rośnie, nie porzucamy go ani nie kończymy drzewa
 
 
 def _stalled(nodes):
@@ -28,18 +29,24 @@ def _stalled(nodes):
 
 
 def _gain_dried_up(obs):
-    """Czy ostatnia warstwa głębokości nie podniosła rekordu drzewa o STOP_GAIN.
+    """Czy dwie ostatnie warstwy głębokości nie podniosły rekordu drzewa o STOP_GAIN.
 
     Każda runda kosztuje czas (beta * godziny), a w głębi drzewa zyski są małe,
-    więc jedna runda bez postępu oznacza, że dalsze otwieranie się zwykle nie zwróci."""
+    więc brak postępu przez dwie rundy oznacza, że dalsze otwieranie się nie zwróci."""
     depth = max(o["glebokosc"] for o in obs)
     if depth < STOP_DEPTH:
         return False
-    old = [o["s_v"] for o in obs if o["glebokosc"] < depth]
-    new = [o["s_v"] for o in obs if o["glebokosc"] >= depth]
+    old = [o["s_v"] for o in obs if o["glebokosc"] < depth - 1]
+    new = [o["s_v"] for o in obs if o["glebokosc"] >= depth - 1]
     if not old or not new:
         return False
     return max(new) - max(old) < STOP_GAIN
+
+
+def _climbing(nodes):
+    """Czy ostatni węzeł (nie korzeń) był dużym skokiem, czyli łańcuch wciąż szybko rośnie."""
+    tip = nodes[-1]
+    return tip["glebokosc"] >= 2 and (tip.get("delta") or 0.0) >= CLIMB
 
 
 def solve(question):
@@ -49,11 +56,13 @@ def solve(question):
     width = question.max_parallelism
     if not obs:
         return [None] * width if can_open else []
-    if _gain_dried_up(obs):
-        return []
     chains = {}
     for o in obs:
         chains.setdefault(o["lancuch"], []).append(o)
+    # brak postępu w drzewie zatrzymuje je, chyba że jakiś żywy łańcuch wciąż gwałtownie rośnie
+    if _gain_dried_up(obs) and not any(
+            _climbing(nodes) for nodes in chains.values() if nodes[-1]["wezel"] in legal):
+        return []
     global_best = max(o["s_v"] for o in obs)
     remaining = max(0, question.max_rounds - question.round - 1)
     gap = GAP + GAP_PER_ROUND * remaining
@@ -68,7 +77,8 @@ def solve(question):
             # (paczka kosztuje tyle co najdłuższy węzeł), więc zatrzymany nie jest zamykany
             if _stalled(nodes) and record < global_best - NEAR:
                 continue
-            if record < global_best - gap:
+            # łańcuch po dużym skoku nie jest jeszcze skreślony: głębsze próby mogą go odbić
+            if record < global_best - gap and not _climbing(nodes):
                 continue
         packet.append(tip)
     # wolne miejsca w paczce: nowe łańcuchy tylko na początku drzewa
