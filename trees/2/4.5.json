@@ -2,16 +2,25 @@
  "rodzic": "4.4",
  "rodzic_sha": "f0f02effc5caf3a67a05b06f159bcb34c003d8df",
  "kolejnosc": 20,
- "sha": "f0f02effc5caf3a67a05b06f159bcb34c003d8df",
- "stan": "sesja",
- "gist": "",
- "notatki": [],
+ "sha": "5b0741ffb223fa21d52802acaa8dd504f476481d",
+ "stan": "ocena w toku",
+ "gist": "Szerszy etap drogiej oceny liści: FINAL 8 -> 10",
+ "notatki": [
+  "Szerszy etap drogiej oceny liści: FINAL 8 -> 10\nMechanizm: więcej liści wiązki dostaje fit po typach + ryzyko (losowe i trudne tacki); 4.4 (0.925) wybierał spośród 8.\nDowód: 4.4 oceniony w 25.4 min (limit 60), 47 przegranych na 300; zapas czasu. Lokalnie FINAL=12 ok. 1.8x czasu (szacunek 45 min, za ryzykowne), więc 10.\nNie powtórka: FINAL nie był zmieniany od 3.1 poza FINAL=20 (odrzucone przed hard/fit po typach).\nRyzyko: czas oceny ok. 35 min; wynik niezmierzony.\n\nCo dalej: zrobione - ten commit. Następny krok: po ocenie, jeśli czas < 40 min, SAMPLES 12->24. Nie powtarzać: dead w _cheap, hard=1000, FINAL=20.\n\nCo-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+ ],
  "koszt": {
-  "tury": 0,
-  "usd": 0.0,
-  "minuty": 0.0
+  "tury": 14,
+  "usd": 0.1765,
+  "minuty": 2.4
  },
  "oczekiwanie_min": 0.0,
  "kontynuacje_tur": 0,
- "sesje": []
+ "sesje": [
+  {
+   "start": "2026-10-10T04:19:38Z",
+   "koniec": "2026-10-10T04:22:02Z",
+   "tury": 14,
+   "przyczyna": "terminal_reason=completed"
+  }
+ ]
 }
