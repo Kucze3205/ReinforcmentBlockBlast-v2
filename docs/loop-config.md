@@ -248,7 +248,7 @@ ale po niej drzewo już się nie otworzy.
 | wdrożenie | `.github/policy/policy.py` tylko gdy wygrała inna niż bieżąca; zawsze archiwum fazy `.github/policy/history/faza-<t>/r####/` (`policy.py`, `wynik.json`) |
 | awaria | bez commita zostaje poprzednia polityka, a pętla idzie dalej (`drzewo.yml` jest wołany zawsze, o ile sonda poświadczenia przeszła) |
 
-**Sesja meta** (`offline.sh`, model `claude-sonnet-5-5`, `--effort high`, sufit 80 min i 80 tur na wersję, jedno
+**Sesja meta** (`offline.sh`, model `claude-haiku-5-5`, `--effort max`, sufit 50 min i 80 tur na wersję, jedno
 czekanie na reset limitu subskrypcji do 4 h). Prompt to `.github/policy/meta.md` skopiowany jako `ZADANIE.md`. Dysk
 sesji to katalog `meta/` w `$RUNNER_TEMP`: `policy.py` (najlepsza dotąd wersja, jedyny plik, który się liczy),
 `history/biezaca/r####/` (wersje tej fazy z `V`, `V_drzewa` i śladami odtworzenia), `history/faza-*/`

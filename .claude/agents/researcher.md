@@ -1,7 +1,7 @@
 ---
 name: researcher
 description: Subagent do jednego wąskiego pytania o fakt spoza repo (dokumentacja, kod źródłowy, literatura). Zwraca krótką odpowiedź, niczego nie zapisuje.
-model: sonnet
+model: claude-haiku-5-5
 tools: Read, Grep, Glob, WebSearch, WebFetch
 ---
 

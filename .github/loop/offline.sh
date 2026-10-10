@@ -8,7 +8,7 @@ T=$1
 RUN="$RUNNER_TEMP/offline"
 META="$RUNNER_TEMP/meta"
 OFFLINE="python3 .github/loop/offline.py"
-SESJA_MIN=80   # sufit jednej sesji; M razy tyle musi się zmieścić w jobie
+SESJA_MIN=50  # sufit jednej sesji; M razy tyle musi się zmieścić w jobie
 
 export CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=1
 export CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1
@@ -18,7 +18,7 @@ sesja() {
   OUT="$RUNNER_TEMP/sesja-$1"
   mkdir -p "$OUT"
   (cd "$META" && timeout "${SESJA_MIN}m" claude -p "Przeczytaj ZADANIE.md i wykonaj je." \
-    --model claude-sonnet-5-5 --effort high \
+    --model claude-haiku-5-5 --effort max \
     --permission-mode acceptEdits \
     --allowedTools "Read,Edit,Write,Glob,Grep,Skill" \
     --disallowedTools "Bash,WebSearch,WebFetch,Agent,Monitor" \

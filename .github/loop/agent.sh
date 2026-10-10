@@ -23,7 +23,7 @@ export BASH_DEFAULT_TIMEOUT_MS=$((SESJA_MIN * 60000)) BASH_MAX_TIMEOUT_MS=$((SES
 export KONIEC=$(( $(date +%s) + SESJA_MIN * 60 ))
 
 timeout "${SESJA_MIN}m" claude -p "$PROMPT" \
-  --model claude-sonnet-5-5 --effort medium \
+  --model claude-haiku-5-5 --effort max \
   --permission-mode acceptEdits \
   --allowedTools "Read,Edit,Write,Glob,Grep,Skill,Agent,WebSearch,WebFetch,Bash(git *),Bash(python *),Bash(python3 *),Bash(pytest *),Bash(pip install *)" \
   --disallowedTools Monitor \
