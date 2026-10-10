@@ -15,8 +15,6 @@ EPS = 0.002       # minimalna poprawa rekordu łańcucha, by liczyła się jako 
 GAP = 0.03        # łańcuch, którego rekord jest o tyle gorszy od najlepszego w drzewie, jest porzucany
 GAP_PER_ROUND = 0.01   # tyle luzu więcej na każdą pozostałą rundę
 NEAR = 0.01       # łańcuch z rekordem w tej odległości od najlepszego nie jest zamykany za zastój
-STOP_DEPTH = 4    # od tej głębokości sprawdzamy, czy drzewo jeszcze się opłaca
-STOP_GAIN = 0.005 # minimalny wzrost rekordu drzewa w dwóch ostatnich warstwach, by kontynuować
 
 
 def _stalled(nodes):
@@ -27,21 +25,6 @@ def _stalled(nodes):
     return all(o["s_v"] < best + EPS for o in nodes[-MISSES:])
 
 
-def _gain_dried_up(obs):
-    """Czy dwie ostatnie warstwy głębokości nie podniosły rekordu drzewa o STOP_GAIN.
-
-    Każda runda kosztuje czas (beta * godziny), a w głębi drzewa zyski są małe,
-    więc brak postępu przez dwie rundy oznacza, że dalsze otwieranie się nie zwróci."""
-    depth = max(o["glebokosc"] for o in obs)
-    if depth < STOP_DEPTH:
-        return False
-    old = [o["s_v"] for o in obs if o["glebokosc"] < depth - 1]
-    new = [o["s_v"] for o in obs if o["glebokosc"] >= depth - 1]
-    if not old or not new:
-        return False
-    return max(new) - max(old) < STOP_GAIN
-
-
 def solve(question):
     obs = question.observed()
     legal = set(a for a in question.legal_actions() if a is not None)
@@ -49,8 +32,6 @@ def solve(question):
     width = question.max_parallelism
     if not obs:
         return [None] * width if can_open else []
-    if _gain_dried_up(obs):
-        return []
     chains = {}
     for o in obs:
         chains.setdefault(o["lancuch"], []).append(o)
