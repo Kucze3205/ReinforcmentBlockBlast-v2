@@ -58,6 +58,12 @@ class ModelPolicy:
         return tuple(move)
 
 
+def build(weights=None):
+    """Polityka oceniana przez ewaluator; wagi nie są używane (przeszukiwanie bez sieci)."""
+    from survival import SearchPolicy
+    return SearchPolicy()
+
+
 def _immediate_gain(game, action):
     """Punkty, które da to postawienie — wg skalibrowanego wzoru, bez zmiany stanu gry."""
     idx, x, y = action
