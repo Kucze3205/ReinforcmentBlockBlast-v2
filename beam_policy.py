@@ -94,6 +94,13 @@ def _tray_ok(b, poses):
 _TYPES = [[p.index for p in PIECE_POOL if p.type_index == t] for t in range(15)]
 RISK_TRAYS = 12
 RISK_W = 25.0
+HARD_TYPES = (7, 10, 4, 6, 12)  # 3x3, duże L, 1x5, 2x3, przekątna 3
+HARD_W = 400.0
+
+
+def _hard_trays(rng):
+    h = [rng.choice(_TYPES[t]) for t in HARD_TYPES]
+    return [(h[i], h[j], h[k]) for i in range(5) for j in range(i, 5) for k in range(j, 5)]
 
 
 def _trays(rng):
@@ -108,6 +115,7 @@ class BeamPolicy:
 
     def reset(self, game_seed):
         self._rng = random.Random(f"risk:{game_seed}")
+        self._hard = _hard_trays(self._rng)
 
     def act(self, game, actions):
         board = 0
@@ -142,6 +150,8 @@ class BeamPolicy:
         for b, first in done[:FIT_LEAVES]:
             bad = sum(not _tray_ok(b, t) for t in trays)
             s = _cheap(b) - W["fit"] * _fit(b) + RISK_W * bad
+            if HARD_W:
+                s += HARD_W * sum(not _tray_ok(b, t) for t in self._hard) / len(self._hard)
             if bs is None or s < bs:
                 best, bs = first, s
         return best if best in actions else actions[0]
