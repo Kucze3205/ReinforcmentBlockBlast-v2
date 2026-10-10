@@ -2,16 +2,25 @@
  "rodzic": "2.1",
  "rodzic_sha": "1d08acf57eebae204034542cfe4e78f17aa72f2d",
  "kolejnosc": 6,
- "sha": "1d08acf57eebae204034542cfe4e78f17aa72f2d",
- "stan": "sesja",
- "gist": "",
- "notatki": [],
+ "sha": "88003f2c5bbed71755688b7d9a9db1ed07070e0c",
+ "stan": "ocena w toku",
+ "gist": "Odtwórz najlepszy kod (3.1, 0.901) i poszerz wiązkę: beam 40->80, final 20->30",
+ "notatki": [
+  "Odtwórz najlepszy kod (3.1, 0.901) i poszerz wiązkę: beam 40->80, final 20->30\n\nMechanizm: kod = 3.patch (SearchPolicy: wiązka po tacce, risk() z martwymi pozami i trójkami z najciaśniejszych póz, mob_w 1.4). Zmiana tylko w zakresie przeszukiwania: szersza wiązka, więcej liści z karą za ryzyko. Dowód: 3.1=0.901 najlepszy w drzewie 4 (1.1 0.813, 2.1 0.751, 4.1 0.881); 3.1 notuje, że strojenie samych wag to szum. Nie powtórka: żadna próba nie ruszała beam/final. Ryzyko: czas, ok. 0.1 s/ruch lokalnie (smoke, nie ocena); zysk niezmierzony.\n\nCo dalej: zrobione (ten commit). Następny krok po ocenie: jeśli zysk, szerzej; jeśli nie, risk z większym tight_max/tight_cnt. Nie powtarzać: losowe strojenie wag.\n\nCo-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+ ],
  "koszt": {
-  "tury": 0,
-  "usd": 0.0,
-  "minuty": 0.0
+  "tury": 19,
+  "usd": 0.2164,
+  "minuty": 2.6
  },
  "oczekiwanie_min": 0.0,
  "kontynuacje_tur": 0,
- "sesje": []
+ "sesje": [
+  {
+   "start": "2026-10-10T11:04:42Z",
+   "koniec": "2026-10-10T11:07:16Z",
+   "tury": 19,
+   "przyczyna": "terminal_reason=completed"
+  }
+ ]
 }
