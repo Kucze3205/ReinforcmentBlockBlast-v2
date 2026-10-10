@@ -59,10 +59,19 @@ def _popcount(x):
     return bin(x).count("1")
 
 
+_POSE_W = [1.0 / (len(PIECE_TYPES) * len(PIECE_TYPES[p.type_index])) for p in PIECE_POOL]
+
+
+def _fit_poses(board):
+    return [p for p in range(len(PIECE_POOL)) if any(not board & m for _x, _y, m in _MASKS[p])]
+
+
 P = {"occ": 1.4, "iso": 0.75, "edge": 1.5, "wall": 2.0, "line": 4.2,
-     "risk": 400.0, "fit": 80.0, "dead": 66.0,
+     "risk": 400.0, "fit": 80.0, "dead": 12.3,
      "beam": 40, "final": 12, "mid": 0,
-     "hard": 500.0, "nhard": 16}
+     "hard": 500.0, "nhard": 16,
+     "two": 300.0, "pairs": 4, "budget": 150,
+     "joint": 5000.0, "njoint": 24}
 
 
 def _cheap(board):
@@ -95,19 +104,40 @@ def _playable(board, poses):
     return False
 
 
+def _playable_within(board, poses, left):
+    """Jak _playable, ale z budżetem węzłów; po jego wyczerpaniu zwraca True (bez kary)."""
+    if not poses:
+        return True
+    if left[0] <= 0:
+        return True
+    left[0] -= 1
+    seen = set()
+    for k, pose in enumerate(poses):
+        if pose in seen:
+            continue
+        seen.add(pose)
+        rest = poses[:k] + poses[k + 1:]
+        for _x, _y, m in _MASKS[pose]:
+            if not board & m and _playable_within(_clear(board | m)[0], rest, left):
+                return True
+    return False
+
+
 def _fit_stats(board):
-    """(średnia po typach z odsetka pasujących póz, P(następna tacka ma klocek bez miejsca))."""
+    """(średnia po typach z odsetka pasujących póz, liczba typów bez żadnego miejsca)."""
     tot = 0.0
-    q = 0.0
+    dead_types = 0
     for poses in PIECE_TYPES:
         fit = 0
         for pi in poses:
-            if any(not board & m for _x, _y, m in _MASKS[pi]):
-                fit += 1
-            else:
-                q += 1.0 / (len(PIECE_TYPES) * len(poses))
+            for _x, _y, m in _MASKS[pi]:
+                if not board & m:
+                    fit += 1
+                    break
+        if fit == 0:
+            dead_types += 1
         tot += fit / len(poses)
-    return tot / len(PIECE_TYPES), 1.0 - (1.0 - q) ** 3
+    return tot / len(PIECE_TYPES), dead_types
 
 
 class SearchPolicy:
@@ -136,19 +166,48 @@ class SearchPolicy:
         ]
 
     def _leaf(self, board, lines):
-        mean_fit, dead_next = _fit_stats(board)
+        mean_fit, dead_types = _fit_stats(board)
         risk = (1.0 - mean_fit) ** 3
-        hard = 0.0
-        if P["hard"] and self._trays:
-            hard = sum(not _playable(board, t) for t in self._trays) / len(self._trays)
+        playable = [_playable(board, t) for t in self._trays] if P["hard"] else []
+        hard = sum(not ok for ok in playable) / len(playable) if playable else 0.0
         return (
             -P["hard"] * hard +
+            -P["two"] * self._two_tray(board, playable) +
+            -P["joint"] * self._joint_risk(board) +
             _cheap(board)
             + P["line"] * lines
             - P["risk"] * risk
             - P["fit"] * (1.0 - mean_fit)
-            - P["dead"] * dead_next
+            - P["dead"] * dead_types
         )
+
+    def _two_tray(self, board, playable):
+        pairs = min(int(P["pairs"]), len(playable) // 2)
+        if not pairs or not P["two"]:
+            return 0.0
+        bad = 0
+        for i in range(pairs):
+            if not playable[2 * i]:
+                continue
+            left = [int(P["budget"])]
+            if not _playable_within(board, self._trays[2 * i] + self._trays[2 * i + 1], left):
+                bad += 1
+        return bad / pairs
+
+    def _joint_risk(self, board):
+        n = int(P["njoint"])
+        if not P["joint"] or not n:
+            return 0.0
+        fit = _fit_poses(board)
+        if not fit:
+            return 0.0
+        w = [_POSE_W[p] for p in fit]
+        bad = 0
+        for _ in range(n):
+            tray = tuple(self.rng.choices(fit, weights=w, k=3))
+            if not _playable(board, tray):
+                bad += 1
+        return sum(w) ** 3 * bad / n
 
     def _search(self, board, poses):
         """poses: lista (idx_w_tacce, pose). Zwraca najlepszy ciąg (idx, x, y) lub None."""
