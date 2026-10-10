@@ -107,9 +107,11 @@ HARD = (7, 9, 4, 6, 12)    # 3x3, duże L, 1x5, 2x3, przekątna 3
 class SurvivalPolicy:
     name = "survival"
 
-    def __init__(self, beam=100, final=10, final_crowded=24, trays=12, risk_w=60.0, hard_w=400.0):
+    def __init__(self, beam=100, final=10, final_crowded=24, trays=12, risk_w=60.0, hard_w=400.0,
+                 n2=6, n3=4, top2=6, risk2_w=120.0, crowd2=30):
         self.beam, self.final, self.final_crowded = beam, final, final_crowded
         self.trays, self.risk_w, self.hard_w = trays, risk_w, hard_w
+        self.n2, self.n3, self.top2, self.risk2_w, self.crowd2 = n2, n3, top2, risk2_w, crowd2
 
     def reset(self, game_seed):
         self.rng = random.Random(f"surv:{game_seed}")
@@ -127,9 +129,47 @@ class SurvivalPolicy:
                     w = 6 if n == 3 else 3 if n == 2 else 1
                     out.append((w, [rng.choice(PIECE_TYPES[HARD[t]]) for t in (i, j, k)]))
         self.hard = out
+        self.samples2 = self.samples[: self.n2]
+        self.samples3 = [[rng.choice(PIECE_TYPES[rng.randrange(15)]) for _ in range(3)] for _ in range(self.n3)]
 
     def _risk(self, b):
         return sum(not playable(b, ps) for ps in self.samples) / self.trays
+
+    def _terminals(self, b, ps):
+        """Plansze po postawieniu całej tacki ps (dowolna kolejność), bez powtórek."""
+        out = set()
+        seen = set()
+
+        def rec(b, rem):
+            if not rem:
+                out.add(b)
+                return
+            if (b, rem) in seen:
+                return
+            seen.add((b, rem))
+            for i, p in enumerate(ps):
+                if rem >> i & 1:
+                    for m in BARE[p]:
+                        if not m & b:
+                            rec(clear(b | m), rem ^ (1 << i))
+
+        rec(b, (1 << len(ps)) - 1)
+        return out
+
+    def _risk2(self, b):
+        """Dwie tacki w przód: odsetek próbnych tacek, po których każde postawienie zostawia ryzykowną planszę."""
+        bad = 0.0
+        for ps in self.samples2:
+            ends = sorted(self._terminals(b, ps), key=cheap, reverse=True)[: self.top2]
+            best = 1.0
+            for e in ends:
+                r = sum(not playable(e, q, 400) for q in self.samples3) / len(self.samples3)
+                if r < best:
+                    best = r
+                    if r == 0:
+                        break
+            bad += best
+        return bad / len(self.samples2)
 
     def _hard_risk(self, b):
         return sum(w for w, ps in self.hard if not playable(b, ps)) / 125.0
@@ -176,6 +216,8 @@ class SurvivalPolicy:
         best, best_s = None, None
         for (bd, _), (sc, first) in top:
             s = sc - self.risk_w * self._risk(bd) - self.hard_w * self._hard_risk(bd)
+            if b.bit_count() > self.crowd2:
+                s -= self.risk2_w * self._risk2(bd)
             if best_s is None or s > best_s:
                 best, best_s = first, s
         return tuple(best)
