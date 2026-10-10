@@ -1,11 +1,4 @@
-"""
-Polityka przeżycia: wiązka po tacce na bitboardach + ryzyko niegrywalnej następnej tacki.
-
-Plansza to 64-bitowa liczba (bit = y*8 + x). Z bieżącej tacki budujemy wiązką kolejności
-i położenia klocków (tanie cechy), a kilka najlepszych liści ocenia drogo: kara za trudne
-tacki następne (dokładne trójki 5 trudnych typów ważone multizbiorem), za losowe tacki
-oraz liczba póz mieszczących się na planszy.
-"""
+"""Polityka przeżycia: wiązka po tacce na bitboardach, liście oceniane cechami i ryzykiem trudnych tacek."""
 import itertools
 import random
 
@@ -16,8 +9,9 @@ ROWS = [0xFF << (8 * y) for y in range(8)]
 COLS = [sum(1 << (8 * y + x) for y in range(8)) for x in range(8)]
 NOT_A = FULL & ~COLS[0]
 NOT_H = FULL & ~COLS[7]
+LEFT, RIGHT, TOP, BOTTOM = COLS[0], COLS[7], ROWS[0], ROWS[7]
+WALLS = LEFT | RIGHT | TOP | BOTTOM
 
-# PLACE[poza] = [(maska, x, y)]
 PLACE = []
 for _p in PIECE_POOL:
     _h, _w = len(_p.shape), len(_p.shape[0])
@@ -41,59 +35,59 @@ HARD_TRIPLES = [
 BEAM = 40
 FINAL = 8
 FINAL_TIGHT = 20
+OCC_W = 1.4
+POCKET_W = 0.75
+EDGE_W = 1.5
+WALL_W = 2.0
+LINE_W = 4.2
+RISK_W = 400.0
+FIT_W = 80.0
+DEAD_W = 12.3
 HARD_W = 400.0
-RAND_W = 150.0
-RAND_N = 10
-MOB_W = 1.0
-LINE_W = 0.0
-LA_W = 0.0
-LA_BEAM = 6
-LA_DEAD = -300.0
-FILL_W = 1.0
-ISO_W = 10.0
-TRANS_W = 5.0
 
-
-def _pop(v):
-    return bin(v).count("1")
-
-
-if hasattr(int, "bit_count"):
-    def _pop(v):  # noqa: F811
-        return v.bit_count()
+try:
+    _pop = int.bit_count
+except AttributeError:
+    def _pop(v):
+        return bin(v).count("1")
 
 
 def clear(b):
-    full = 0
-    for r in ROWS:
-        if b & r == r:
-            full |= r
-    for c in COLS:
-        if b & c == c:
-            full |= c
-    return b & ~full if full else b
+    kill = 0
+    lines = 0
+    for m in ROWS:
+        if b & m == m:
+            kill |= m
+            lines += 1
+    for m in COLS:
+        if b & m == m:
+            kill |= m
+            lines += 1
+    return b & ~kill, lines
 
 
 def cheap(b):
-    e = ~b & FULL
-    nb = ((e << 1) & NOT_A) | ((e >> 1) & NOT_H) | (e << 8) | (e >> 8)
-    iso = _pop(e & ~(nb & FULL))
-    trans = _pop((b ^ (b >> 1)) & NOT_H) + _pop(b ^ (b >> 8))
-    line = 0
-    for r in ROWS:
-        n = _pop(b & r)
-        line += n * n
-    for c in COLS:
-        n = _pop(b & c)
-        line += n * n
-    return -_pop(b) * FILL_W - iso * ISO_W - trans * TRANS_W + line * LINE_W
+    empty = ~b & FULL
+    a = ((b << 1) & NOT_A) | LEFT
+    r = ((b >> 1) & NOT_H) | RIGHT
+    u = (b << 8) | TOP
+    d = (b >> 8) | BOTTOM
+    pockets = (a & r & u) | (a & r & d) | (a & u & d) | (r & u & d)
+    edges = _pop((b ^ (b >> 1)) & NOT_H) + _pop(b ^ (b >> 8))
+    walls = _pop(empty & WALLS)
+    return (-OCC_W * _pop(b) - POCKET_W * _pop(pockets & empty)
+            - EDGE_W * edges - WALL_W * walls)
 
 
-def fits(b, pose):
-    for m, _, _ in PLACE[pose]:
-        if not b & m:
-            return True
-    return False
+def fit_stats(b):
+    tot = 0.0
+    dead = 0
+    for poses in PIECE_TYPES:
+        fit = sum(1 for p in poses if any(not b & m for m, _, _ in PLACE[p]))
+        if fit == 0:
+            dead += 1
+        tot += fit / len(poses)
+    return tot / len(PIECE_TYPES), dead
 
 
 def tray_ok(b, poses):
@@ -107,7 +101,7 @@ def tray_ok(b, poses):
         seen.add(p)
         rest = poses[:i] + poses[i + 1:]
         for m, _, _ in PLACE[p]:
-            if not b & m and tray_ok(clear(b | m), rest):
+            if not b & m and tray_ok(clear(b | m)[0], rest):
                 return True
     return False
 
@@ -154,69 +148,42 @@ class SurvivalPolicy:
 
     def _search(self, b, tray):
         n = len(tray)
-        states = [(b, 0, (), ())]
+        states = [(b, 0, tuple(range(n)), (), ())]
         for _ in range(n):
             nxt = {}
-            for brd, used, seq, bs in states:
-                for k, (idx, pose) in enumerate(tray):
-                    if used >> k & 1:
-                        continue
+            for brd, lines, rem, seq, bs in states:
+                for k in rem:
+                    idx, pose = tray[k]
+                    rest = tuple(r for r in rem if r != k)
                     for m, x, y in PLACE[pose]:
                         if brd & m:
                             continue
-                        nb = clear(brd | m)
-                        key = (nb, used | 1 << k)
-                        if key not in nxt:
-                            nxt[key] = (nb, used | 1 << k, seq + ((idx, x, y),), bs + (nb,))
+                        nb, ln = clear(brd | m)
+                        cum = lines + ln
+                        sc = cheap(nb) + LINE_W * cum
+                        key = (nb, rest)
+                        cur = nxt.get(key)
+                        if cur is None or sc > cur[0]:
+                            nxt[key] = (sc, nb, cum, rest, seq + ((idx, x, y),), bs + (nb,))
             if not nxt:
                 break
-            states = sorted(nxt.values(), key=lambda s: -cheap(s[0]))[:BEAM]
-        if not states[0][2]:
+            states = [v[1:] for v in sorted(nxt.values(), key=lambda v: -v[0])[:BEAM]]
+        if not states[0][3]:
             return None, None
-        uniq = {}
-        for s in states:
-            uniq.setdefault((s[0], len(s[2])), s)
-        cand = sorted(uniq.values(), key=lambda s: -cheap(s[0]))
         final = FINAL_TIGHT if 64 - _pop(b) <= 22 else FINAL
-        cand = cand[:final]
         hard = [self.rng.choice(PIECE_TYPES[t]) for t in HARD_TYPES]
-        rand = [[self.rng.choice(PIECE_TYPES[self.rng.randrange(15)]) for _ in range(3)]
-                for _ in range(RAND_N)]
         best, best_s = None, None
-        for s in cand:
-            sc = self._deep(s[0], hard, rand) - 1e5 * (n - len(s[2]))
+        for brd, lines, _rem, seq, bs in states[:final]:
+            sc = self._leaf(brd, lines, hard)
             if best_s is None or sc > best_s:
-                best, best_s = s, sc
-        return list(best[2]), list(best[3])
+                best, best_s = (seq, bs), sc
+        return list(best[0]), list(best[1])
 
-    def _lookahead(self, b, poses):
-        """Najlepsza tania ocena planszy po postawieniu całej tacki; LA_DEAD gdy się nie da."""
-        states = {(b, 0): b}
-        for _ in poses:
-            nxt = {}
-            for (brd, used), _b in states.items():
-                for k, pose in enumerate(poses):
-                    if used >> k & 1:
-                        continue
-                    for m, _, _ in PLACE[pose]:
-                        if not brd & m:
-                            nb = clear(brd | m)
-                            nxt[(nb, used | 1 << k)] = nb
-            if not nxt:
-                return LA_DEAD
-            states = dict(sorted(nxt.items(), key=lambda kv: -cheap(kv[1]))[:LA_BEAM])
-        return max(cheap(v) for v in states.values())
-
-    def _deep(self, b, hard, rand):
-        sc = cheap(b)
-        if LA_W:
-            sc += LA_W * sum(self._lookahead(b, t) for t in rand) / len(rand)
+    def _leaf(self, b, lines, hard):
+        mean_fit, dead = fit_stats(b)
         bad = 0.0
         for c, w in HARD_TRIPLES:
             if not tray_ok(b, [hard[i] for i in c]):
                 bad += w
-        sc -= HARD_W * bad
-        r = sum(1 for t in rand if not tray_ok(b, t))
-        sc -= RAND_W * r / len(rand)
-        mob = sum(1 for p in range(len(PLACE)) if fits(b, p))
-        return sc + MOB_W * mob
+        return (cheap(b) + LINE_W * lines - RISK_W * (1.0 - mean_fit) ** 3
+                - FIT_W * (1.0 - mean_fit) - DEAD_W * dead - HARD_W * bad)
