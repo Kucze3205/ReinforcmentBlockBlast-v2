@@ -2,16 +2,25 @@
  "rodzic": "4.1",
  "rodzic_sha": "dab34cdbbac5040f5752bd9b98f4c1d06981976c",
  "kolejnosc": 8,
- "sha": "dab34cdbbac5040f5752bd9b98f4c1d06981976c",
- "stan": "sesja",
- "gist": "",
- "notatki": [],
+ "sha": "19bb2c48296c165d095866e750b885aa59628bc7",
+ "stan": "ocena w toku",
+ "gist": "Liść z cechami węzła 2.1 i ryzykiem trudnych tacek ważonym multizbiorem (5/4.2)",
+ "notatki": [
+  "Liść z cechami węzła 2.1 i ryzykiem trudnych tacek ważonym multizbiorem (5/4.2)\n\nMechanizm:\n- liść wiązki: occ 1.4, kieszenie 0.75, krawędzie 1.5, puste pola przy brzegu 2.0; linie 4.2 liczone w wiązce i w liściu\n- dopasowanie typów: (1-średnia_pasujących)^3 * 400 + (1-średnia) * 80 + martwe typy * 12.3\n- ryzyko trudnej tacki: dokładne trójki z 5 trudnych typów [3,4,7,6,10] ważone multizbiorem (400), jedna poza na typ losowana na ruch\n- FINAL adaptacyjne: 20 gdy <=22 wolnych pól, inaczej 8; BEAM 40\n- usunięte z 4.1: losowe tacki (RAND), mobilność, lookahead, iso=10 i trans=5\n\nDowód z historii:\n- 5/2.1 = 0.983: ten sam zestaw cech, ale ryzyko z 16 próbkowanych tacek i FINAL stałe 12\n- 5/4.1 = 0.944: nasz multizbiór bez cech 2.1 (bez linii, dopasowania i martwych typów)\n- 2/3.7 = 0.949: multizbiór zamiast próbkowania, wzrost względem 2/3.6 = 0.933, który wprowadził adaptacyjne FINAL\n\nDlaczego to nie powtórka: 2.1 nie ma multizbioru ani adaptacyjnego FINAL, a 4.1 nie ma cech liścia 2.1. Połączenie tych elementów jest nowe i nie jest kopią żadnego węzła.\n\nRyzyko: wynik niezmierzony, rozstrzyga ocena. Jedna poza na typ na ruch może być zbyt szumna wobec 16 próbek z 2.1, a wagi 2.1 nie były strojone pod tę estymację. Testy: 17, jeden błąd tkinter (model.py importuje turtle), istniał przed zmianą. Sprawdzenia: cheap i clear zgodne z referencją na 404 planszach; smoke 3 partie bez wyjątków, czas porównywalny z 4.1.\n\nCo dalej:\n- zrobione: dab34cd (węzeł 4.1)\n- następny krok: ocena 5/4.2; jeśli wynik jest poniżej 0.983 (2.1), sprawdzić, czy spadek idzie z ryzyka multizbioru (HARD_W, jedna poza na typ na ruch)\n- czego nie powtarzać: przenoszenia 2.1 bez zmiany estymatora; lokalnego strojenia wag (tools/tune.py) traktowanego jako pomiar wyniku\n\nCo-Authored-By: Claude Code <noreply@anthropic.com>"
+ ],
  "koszt": {
-  "tury": 0,
-  "usd": 0.0,
-  "minuty": 0.0
+  "tury": 45,
+  "usd": 3.3649,
+  "minuty": 14.7
  },
  "oczekiwanie_min": 0.0,
  "kontynuacje_tur": 0,
- "sesje": []
+ "sesje": [
+  {
+   "start": "2026-10-10T16:32:15Z",
+   "koniec": "2026-10-10T16:46:58Z",
+   "tury": 45,
+   "przyczyna": "terminal_reason=completed"
+  }
+ ]
 }
