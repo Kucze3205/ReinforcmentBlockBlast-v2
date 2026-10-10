@@ -75,13 +75,17 @@ def poza(mod):
 # ---------------------------------------------------------------- tempo punktów
 
 def tempo(partie, mod, k):
-    """Te same ruchy w symulatorze vs przyrost licznika apki. Licznik odczytany OCR-em bywa zły:
-    odrzucamy przyrosty ujemne i większe niż `max_delta`; ruch i tak gramy, żeby combo się zgadzało."""
+    """Te same ruchy w symulatorze vs przyrost licznika apki na odcinkach między odczytami licznika (most czyta
+    go co kilka ruchów). Licznik odczytany OCR-em bywa zły: odrzucamy przyrosty ujemne i większe niż `max_delta`
+    na ruch; ruch i tak gramy, żeby combo się zgadzało. `pary` to liczba przyjętych odcinków."""
     pozy = poza(mod)
     app = symul = pary = 0
     for wpisy in partie:
         game = mod.game.Game(seed=0)
+        start = None
         for a, b in zip(wpisy, wpisy[1:]):
+            if a.get("score") is not None:
+                start, zysk, ruchy = a["score"], 0, 0
             m = a.get("move")
             if m is None:
                 continue
@@ -91,14 +95,17 @@ def tempo(partie, mod, k):
             _, _, _, info = game.step((m["slot"], m["x"], m["y"]))   # zwracany przyrost to -5 przy końcu gry, więc różnica wyniku
             game.done = False
             if info == "wrong_placement":
+                start = None   # odcinek z ruchem, którego symulator nie zagra, nie ma porównania
                 continue
-            gained = game.score - przed
-            sa, sb = a.get("score"), b.get("score")
-            if sa is None or sb is None or not 0 <= sb - sa <= k["max_delta"]:
+            if start is None:
                 continue
-            app += sb - sa
-            symul += gained
-            pary += 1
+            zysk += game.score - przed
+            ruchy += 1
+            sb = b.get("score")
+            if sb is not None and 0 <= sb - start <= k["max_delta"] * ruchy:
+                app += sb - start
+                symul += zysk
+                pary += 1
     ok = None if pary < k["min_pary"] or symul <= 0 else abs(app / symul - 1) <= k["tempo"]
     return {"app": app, "sym": symul, "stosunek": round(app / symul, 4) if symul > 0 else None, "pary": pary, "ok": ok}
 

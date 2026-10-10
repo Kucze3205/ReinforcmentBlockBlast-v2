@@ -31,6 +31,9 @@ TRAY_Y0, TRAY_Y1, TRAY_CELL = 440, 585, 16
 SCORE_BOX = (60, 70, 260, 130)
 FRAMES = 3
 KEEP = 10  # tyle ostatnich ruchów zachowuje zdjęcia i wpis w pomiar.json
+LICZNIK_CO = 10  # OCR licznika co tyle ruchów (i przed przegraną): odczyt kosztował 0,7 s z 4,9 s ruchu (#48)
+ZRZUTY_PO_RUCHU = 12  # tyle zrzutów czeka szybki odczyt stanu po ruchu, zanim wróci do wolnego
+DRAG_WAIT = 0.5  # klocek dogania palec z opóźnieniem
 CEL = int(os.environ.get("CEL", 0))  # licznik apki kończący partię; 0 = bez celu
 LIMIT_S = float(os.environ.get("LIMIT_MINUT", 0)) * 60  # 0 = bez limitu
 DRAG_GAIN = 1.5  # zmierzone: klocek przesuwa się 1,5 px na 1 px palca
@@ -90,6 +93,24 @@ def tray_ok(slots):
     """Ekran końca gry, okno nad grą i launcher dają "klocki" o bokach, jakich klocek nie ma (w logach faza0: 9x7, 7x5, 8x5).
     Taka tacka nie jest odczytem tacki: nie wolno jej zagrać ani zapisać (miara klocków liczyłaby ją jako nieznane)."""
     return all(s is None or max(len(s[0]), len(s[0][0])) <= MAX_KLOCEK for s in slots)
+
+
+def state_after(expected, tray_left):
+    """Stan po ruchu bez stałych czekań: zrzuty jeden za drugim, aż dwa kolejne dadzą planszę przewidzianą
+    przez symulator i tę samą tackę w tych samych miejscach (pozostałe klocki albo, po ostatnim, trzy nowe).
+    Animacja czyszczenia, wjazd klocków i napisy combo nie przechodzą tego warunku. Rozbieżność albo koniec
+    gry wracają do wolnego odczytu, który rozstrzyga jak dotąd."""
+    prev = None
+    for _ in range(ZRZUTY_PO_RUCHU):
+        img = screenshot()
+        grid, slots = read_board(img), read_tray(img)
+        shapes = [s[0] if s else None for s in slots]
+        good = grid == expected and tray_ok(slots) and (shapes == tray_left if any(tray_left) else all(shapes))
+        key = json.dumps([grid, [s and [s[0], [round(c) for c in s[1]]] for s in slots]]) if good else None
+        if key and key == prev:
+            return img, grid, slots
+        prev = key
+    return readable(stable_state())
 
 
 def readable(state):
@@ -198,11 +219,6 @@ def simulate(board, piece, x, y):
     return after.grid
 
 
-def glide(frm, to, steps=10):
-    for k in range(1, steps + 1):
-        touch("MOVE", frm[0] + (to[0] - frm[0]) * k / steps, frm[1] + (to[1] - frm[1]) * k / steps)
-
-
 def drag(slot_center, piece, x, y):
     """Przeciąga klocek ze slotu tak, żeby jego lewy górny róg trafił w pole (x, y).
 
@@ -216,9 +232,11 @@ def drag(slot_center, piece, x, y):
     cx, cy = BOARD_X + (x + w / 2) * CELL, BOARD_Y + (y + h / 2) * CELL
     fx = sx + (cx - sx) / DRAG_GAIN
     fy = sy + (cy - (sy - LIFT)) / DRAG_GAIN
-    touch("DOWN", sx, sy)
-    glide((sx, sy), (fx, fy))
-    time.sleep(0.5)  # klocek dogania palec z opóźnieniem
+    # podniesienie i 10 kroków w jednym `adb shell`: osobne wywołania kosztowały 0,4 s na ruch (#48)
+    path = [(sx + (fx - sx) * k / 10, sy + (fy - sy) * k / 10) for k in range(1, 11)]
+    adb("shell", "; ".join(["input motionevent DOWN %d %d" % (sx, sy)] +
+                           ["input motionevent MOVE %d %d" % p for p in path]))
+    time.sleep(DRAG_WAIT)
     aim = screenshot()
     touch("UP", fx, fy)
     return {"finger": [round(fx, 1), round(fy, 1)]}, aim
@@ -249,7 +267,13 @@ def play(max_moves, st, t0):
     img, grid, slots = readable(settled_state())
     ok_streak = best_streak = last_n = 0
     for n in range(max_moves):
-        score = read_counter(img, st["licznik"], max(1, n - last_n))
+        board = Board()
+        board.grid = [row[:] for row in grid]
+        pieces = [Piece(s[0], f"slot{i}", -1) if s else None for i, s in enumerate(slots)]
+        moves = legal_moves(board, pieces)
+        score = None
+        if n % LICZNIK_CO == 0 or not moves:
+            score = read_counter(img, st["licznik"], max(1, n - last_n))
         if score is not None:
             st["licznik"] = score
             last_n = n
@@ -263,10 +287,6 @@ def play(max_moves, st, t0):
         Image.fromarray(img.astype(np.uint8)).save(os.path.join(OUT, f"{n:03d}_state.png"))
         annotate(img, grid, os.path.join(OUT, f"{n:03d}_read.png"))
         drop_old_images(n)
-        board = Board()
-        board.grid = [row[:] for row in grid]
-        pieces = [Piece(s[0], f"slot{i}", -1) if s else None for i, s in enumerate(slots)]
-        moves = legal_moves(board, pieces)
         entry = {"n": n, "board": grid, "tray": [s[0] if s else None for s in slots], "score": score}
         if not in_game():
             entry["end"] = "gra nie jest na pierwszym planie"
@@ -293,7 +313,7 @@ def play(max_moves, st, t0):
         expected = simulate(board, pieces[i], x, y)
         info, aim = drag(slots[i][1], pieces[i], x, y)
         Image.fromarray(aim.astype(np.uint8)).save(os.path.join(OUT, f"{n:03d}_aim.png"))
-        img, observed, slots = readable(stable_state())
+        img, observed, slots = state_after(expected, [s[0] if s and k != i else None for k, s in enumerate(slots)])
         ok = observed == expected
         grid = observed
         ok_streak = ok_streak + 1 if ok else 0
