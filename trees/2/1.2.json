@@ -2,16 +2,25 @@
  "rodzic": "1.1",
  "rodzic_sha": "d0234bc16d174501cb6cc115cb142a477696a6ec",
  "kolejnosc": 5,
- "sha": "d0234bc16d174501cb6cc115cb142a477696a6ec",
- "stan": "sesja",
- "gist": "",
- "notatki": [],
+ "sha": "4b6e8ef32480417b3f07050bf96d77e4b45e45ff",
+ "stan": "ocena w toku",
+ "gist": "Beam 100, 30 liści z fit-poz, ryzyko tacki włączone (RISK_W=25)",
+ "notatki": [
+  "Beam 100, 30 liści z fit-poz, ryzyko tacki włączone (RISK_W=25)\n\nMechanizm: te same elementy co 1.1, inne parametry. Wiązka 40 -> 100, FIT_LEAVES 10 -> 30,\nRISK_W 0 -> 25 (12 próbnych tacek, pełne DFS). Odpowiada konfiguracji węzła 3.1 (0.882,\nwiązka 100 + ryzyko tacki), który w indeksie bije 1.1 (0.781, wiązka 40, ryzyko off).\nDowód (tools/cmp.py, 48 partii seeds 200-247, limit 500 postawień; NIE ocena): przegranych\n40/30/25: 30, 100/30/25: 22, 100/30/60: 25, 100/60/25: 22; ok. 3 s/partię. Wcześniejszy test\nna 24 partiach był zbyt zaszumiony, żeby cokolwiek rozstrzygnąć.\nRyzyko: szum pomiaru; wynik niezmierzony przez ocenę; czas ruchu wzrósł (~3x).\n\nCo dalej: zrobione - ten commit. Następny krok: po ocenie, jeśli wciąż < 0.92, lepsza ocena\nplanszy (trans 3 + nagroda za linie, kara za typy bez żadnej pozy jak w 3.1).\nNie powtarzać: BEAM 200, FIT_LEAVES 60 (bez zysku), RISK_W 60.\n\nCo-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+ ],
  "koszt": {
-  "tury": 0,
-  "usd": 0.0,
-  "minuty": 0.0
+  "tury": 22,
+  "usd": 0.3027,
+  "minuty": 15.6
  },
  "oczekiwanie_min": 0.0,
  "kontynuacje_tur": 0,
- "sesje": []
+ "sesje": [
+  {
+   "start": "2026-10-10T02:21:11Z",
+   "koniec": "2026-10-10T02:36:48Z",
+   "tury": 22,
+   "przyczyna": "terminal_reason=completed"
+  }
+ ]
 }
