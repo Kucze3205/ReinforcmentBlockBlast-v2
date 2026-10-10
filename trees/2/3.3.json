@@ -2,16 +2,25 @@
  "rodzic": "3.2",
  "rodzic_sha": "927276634fd6982d4d17cfedac9903628139ebe9",
  "kolejnosc": 11,
- "sha": "927276634fd6982d4d17cfedac9903628139ebe9",
- "stan": "sesja",
- "gist": "",
- "notatki": [],
+ "sha": "d20294cbf1fc66d694c8355d53791165c748fb38",
+ "stan": "ocena w toku",
+ "gist": "Kombinacja 3.2 (cecha dead) i 4.2 (fit po typach, zero=5, SAMPLES 24), BEAM 100 -> 70",
+ "notatki": [
+  "Kombinacja 3.2 (cecha dead) i 4.2 (fit po typach, zero=5, SAMPLES 24), BEAM 100 -> 70\n\nMechanizm: do 3.2 (0.890) dodany fit liczony per typ klocka z karą 5 za typ bez miejsca\noraz SAMPLES 12 -> 24 z 4.2 (0.885). To nieprzetestowana kombinacja dwóch osobno\nzmierzonych elementów o różnych punktach zaczepienia (dead: cała wiązka, fit: liście finałowe).\nBEAM 70 zamiast 100 na koszt czasu: lokalnie 149 s vs 126 s dla 3.2 (48 partii x 500),\nszacunek oceny ok. 27 min < limit 60.\nLokalny wskaźnik (nie ocena): 26 przegranych z 48, tyle samo co 3.2 - w szumie, nic nie twierdzę.\nRyzyko: BEAM 70 może zjadać zysk fitu; dead i zero częściowo redundantne.\n\nCo dalej: zrobione (ten commit). Następny krok: po ocenie - jeśli gorzej niż 0.890, wyłączyć dead\n(W[dead]=0) i wrócić BEAM 100 (czyste 4.2 + większa wiązka). Nie powtarzać: dead>40, FINAL w górę.\n\nCo-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+ ],
  "koszt": {
-  "tury": 0,
-  "usd": 0.0,
-  "minuty": 0.0
+  "tury": 13,
+  "usd": 0.2027,
+  "minuty": 5.9
  },
  "oczekiwanie_min": 0.0,
  "kontynuacje_tur": 0,
- "sesje": []
+ "sesje": [
+  {
+   "start": "2026-10-10T03:00:20Z",
+   "koniec": "2026-10-10T03:06:13Z",
+   "tury": 13,
+   "przyczyna": "terminal_reason=completed"
+  }
+ ]
 }
