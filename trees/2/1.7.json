@@ -2,16 +2,25 @@
  "rodzic": "1.6",
  "rodzic_sha": "1b04d3ecbbf4a981c4060e9353d53251544b5d4c",
  "kolejnosc": 24,
- "sha": "1b04d3ecbbf4a981c4060e9353d53251544b5d4c",
- "stan": "sesja",
- "gist": "",
- "notatki": [],
+ "sha": "7f9b32a10671d5f00679c4eba39f3c40f99092f0",
+ "stan": "ocena w toku",
+ "gist": "Kara za kruche trudne tacki: tylko jeden pierwszy ruch prowadzi do postawienia (FRAG_W=100)",
+ "notatki": [
+  "Kara za kruche trudne tacki: tylko jeden pierwszy ruch prowadzi do postawienia (FRAG_W=100)\n\nMechanizm: _tray_margin liczy (do 2) pierwszych ruchów (klocek, pozycja), po których cała trudna tacka da się postawić. Kara HARD_W za 0 takich ruchów (jak dotąd), FRAG_W=100 za dokładnie 1. Dotąd ocena była binarna, więc plansza, na której trudna tacka wchodzi jedną ścieżką, wyglądała tak samo jak zapas.\nDowód z historii: drzewo 2 krąży wokół 0.92-0.93 (1.5 0.922, 1.6 0.923, 3.5 0.934, 3.6 0.933) przez dostrajanie FINAL/SAMPLES/obrotów; przegrane to plansze z wąskim wyjściem. Nie powtórka: żadna próba nie mierzyła zapasu bezpieczeństwa.\nSprawdzono tylko: 4 partie po 200 postawień bez wywrotki, ~7 s/partię (było ~2.7). Wyniku nie mierzyłem.\nRyzyko: czas ruchu ok. 2.5x; FRAG_W niedostrojone.\n\nCo dalej: zrobione (ten commit). Następny krok: po ocenie, jeśli gorzej niż 0.923, FRAG_W 50 albo cap=3; ewentualnie cache _tray_ok. Nie powtarzać: dead, hard=1000, FINAL/SAMPLES w górę.\n\nCo-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+ ],
  "koszt": {
-  "tury": 0,
-  "usd": 0.0,
-  "minuty": 0.0
+  "tury": 10,
+  "usd": 0.1693,
+  "minuty": 1.9
  },
  "oczekiwanie_min": 0.0,
  "kontynuacje_tur": 0,
- "sesje": []
+ "sesje": [
+  {
+   "start": "2026-10-10T05:26:06Z",
+   "koniec": "2026-10-10T05:27:57Z",
+   "tury": 10,
+   "przyczyna": "terminal_reason=completed"
+  }
+ ]
 }
