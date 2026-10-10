@@ -1,4 +1,6 @@
 """Polityka przeżycia: wiązka po tacce na bitboardach (bit y*8+x)."""
+import random
+
 from pieces import PIECE_POOL, PIECE_TYPES
 
 W = 8
@@ -22,9 +24,14 @@ for _idxs in PIECE_TYPES:
     for _i in _idxs:
         PROB[_i] = 1.0 / (15 * len(_idxs))
 
-UNFIT_W = 400.0
+UNFIT_W = 1500.0
+HOLE_W = 15.0
+TRANS_W = 1.5
+GAIN_W = 0.3
+TRIPLES = 40
+TRIPLE_W = 3000.0
 BEAM = 40
-FINAL = 12
+FINAL = 30
 
 
 def clear(b):
@@ -63,6 +70,35 @@ def unfit_mass(b):
     return u
 
 
+def playable(b, trio):
+    """Czy tacka (krotka indeksów póz) da się w całości postawić w jakiejś kolejności."""
+    if not trio:
+        return True
+    for k, pi in enumerate(trio):
+        if pi in trio[:k]:
+            continue
+        rest = trio[:k] + trio[k + 1:]
+        for m, _, _ in MASKS[pi][0]:
+            if not b & m:
+                nb, _ = clear(b | m)
+                if playable(nb, rest):
+                    return True
+    return False
+
+
+def tray_risk(b, rng):
+    bad = 0
+    for _ in range(TRIPLES):
+        trio = tuple(_draw(rng) for _ in range(3))
+        if not playable(b, trio):
+            bad += 1
+    return bad / TRIPLES
+
+
+def _draw(rng):
+    return rng.choice(rng.choice(PIECE_TYPES))
+
+
 def holes(b):
     """Puste pola otoczone zajętymi (lub ścianą) ze wszystkich 4 stron."""
     n = 0
@@ -91,12 +127,12 @@ def transitions(b):
 
 
 def cheap(b, gain):
-    return -bin(b).count("1") - holes(b) * 6 - transitions(b) * 0.5 + gain * 0.05
+    return -bin(b).count("1") - holes(b) * HOLE_W - transitions(b) * TRANS_W + gain * GAIN_W
 
 
 class SurvivalPolicy:
     def reset(self, seed):
-        pass
+        self.n = 0
 
     def act(self, game, actions):
         pieces = [(i, p) for i, p in enumerate(game.pieces) if p is not None]
@@ -127,7 +163,15 @@ class SurvivalPolicy:
         if level[0][2] is None:
             return actions[0]
         top = level[:FINAL]
-        best = max(top, key=lambda s: cheap(s[0], s[3]) - unfit_mass(s[0]) * UNFIT_W)
+        rng = random.Random(self.n)
+        self.n += 1
+        trios = [tuple(_draw(rng) for _ in range(3)) for _ in range(TRIPLES)]
+
+        def final(s):
+            bad = sum(not playable(s[0], t) for t in trios)
+            return cheap(s[0], s[3]) - unfit_mass(s[0]) * UNFIT_W - bad / TRIPLES * TRIPLE_W
+
+        best = max(top, key=final)
         return best[2]
 
 
