@@ -116,6 +116,9 @@ class SurvivalPolicy:
     def reset(self, game_seed):
         self.rng = random.Random(f"surv:{game_seed}")
         self.samples = [[self._rand_pose() for _ in range(3)] for _ in range(SAMPLES)]
+        self._new_hard()
+
+    def _new_hard(self):
         hard = [self.rng.choice(PIECE_TYPES[t]) for t in HARD_TYPES]
         self.hard = [[hard[i], hard[j], hard[k]] for i in range(5)
                      for j in range(i, 5) for k in range(j, 5)]
@@ -126,6 +129,7 @@ class SurvivalPolicy:
     def act(self, game, actions):
         if len(actions) == 1:
             return actions[0]
+        self._new_hard()
         b0 = 0
         for y, row in enumerate(game.board.grid):
             for x, c in enumerate(row):
