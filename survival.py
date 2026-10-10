@@ -140,8 +140,14 @@ class SurvivalPolicy:
 
     def _new_hard(self):
         hard = [self.rng.choice(PIECE_TYPES[t]) for t in HARD_TYPES]
-        self.hard = [[hard[i], hard[j], hard[k]] for i in range(5)
-                     for j in range(i, 5) for k in range(j, 5)]
+        self.hard = []
+        self.hard_w = []
+        for i in range(5):
+            for j in range(i, 5):
+                for k in range(j, 5):
+                    self.hard.append([hard[i], hard[j], hard[k]])
+                    # waga = liczba uporządkowanych trójek tego multizbioru (1, 3 lub 6)
+                    self.hard_w.append(len({(i, j, k), (i, k, j), (j, i, k), (j, k, i), (k, i, j), (k, j, i)}))
 
     def _rand_pose(self):
         return self.rng.choice(self.rng.choice(PIECE_TYPES))
@@ -188,7 +194,7 @@ class SurvivalPolicy:
             bad = sum(1 for s in self.samples if not _playable(b, s))
             v -= W["risk"] * bad / len(self.samples)
             if W["hard"]:
-                v -= W["hard"] * sum(1 for s in self.hard if not _playable(b, s)) / len(self.hard)
+                v -= W["hard"] * sum(w for s, w in zip(self.hard, self.hard_w) if not _playable(b, s)) / 125.0
             if best_v is None or v > best_v:
                 best, best_v = first, v
         if best is None:
