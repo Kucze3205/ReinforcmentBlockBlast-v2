@@ -10,8 +10,8 @@ _NOT_COL0 = _FULL & ~_COLS[0]
 _NOT_COL7 = _FULL & ~_COLS[7]
 _LOW56 = (1 << 56) - 1
 W = {"trans": 3.0, "isolated": 4.0, "filled": 0.5, "fit": 1.5}
-BEAM = 40
-FIT_LEAVES = 10
+BEAM = 100
+FIT_LEAVES = 30
 
 _POSE_MASKS = []  # dla pozy: lista (x, y, maska)
 for _p in PIECE_POOL:
@@ -75,7 +75,7 @@ def _tray_ok(b, poses):
 
 _TYPES = [[p.index for p in PIECE_POOL if p.type_index == t] for t in range(15)]
 RISK_TRAYS = 12
-RISK_W = 0.0
+RISK_W = 25.0
 
 
 def _trays(rng):
