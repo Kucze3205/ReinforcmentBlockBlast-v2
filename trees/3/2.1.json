@@ -2,16 +2,26 @@
  "rodzic": "korzen",
  "rodzic_sha": "caf8e7251570b57ad4a6ebb26f3b0b13e8326fcc",
  "kolejnosc": 2,
- "sha": "caf8e7251570b57ad4a6ebb26f3b0b13e8326fcc",
- "stan": "sesja",
- "gist": "",
- "notatki": [],
+ "sha": "5b0dbe8bc9b568f1237c6256acc4840d458a379c",
+ "stan": "ocena w toku",
+ "gist": "Ryzyko następnej tacki: próbne trójki z DFS grywalności, strojenie wag",
+ "notatki": [
+  "Ryzyko następnej tacki: próbne trójki z DFS grywalności, strojenie wag\n\nMechanizm: 40 losowych trójek (deterministycznie po numerze ruchu) sprawdzanych DFS-em po\nkolejnościach i położeniach z czyszczeniem; kara 3000 * odsetek niegrywalnych, FINAL=30 liści,\nUNFIT_W 1500, HOLE_W 15, TRANS_W 1.5, GAIN_W 0.3. Baza: poprzedni commit (smoke 500x8 ok. 0.36).\nLokalnie (nie ocena, 12 partii x 300, duży szum): ok. 0.68-0.77 przeżycia; wyniki różnią się o szum.\nRyzyko: wolne (ok. 7 s/partię 300 ruchów); wagi dobrane na małej próbie.\n\nCo dalej: zrobione (ten commit). Następny krok: po ocenie; pomysły: kara za kruche trójki,\nważenie trójek prawdopodobieństwem, adaptacyjne FINAL przy zapełnionej planszy.\nNie powtarzać: samego podnoszenia TRIPLES/TRIPLE_W (80 trójek, 10000 nie pomogło).\n\nCo-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>",
+  "Polityka przeżycia: wiązka po tacce na bitboardach, policies.build\n\nMechanizm: wiązka 40 po wszystkich kolejnościach klocków tacki, ocena = wypełnienie, dziury,\nprzejścia, ryzyko niedopasowania pozy (UNFIT_W=400). Kod z drzew 1-2 nie jest w tej gałęzi\n(brak SHA w repo), więc odtworzone od zera. Lokalnie (nie ocena): smoke 500 x8: ok. 0.36 przeżycia.\n\nCo dalej: dodać ryzyko całej następnej tacki (próbne trójki), dostroić wagi.\n\nCo-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+ ],
  "koszt": {
-  "tury": 0,
-  "usd": 0.0,
-  "minuty": 0.0
+  "tury": 42,
+  "usd": 0.555,
+  "minuty": 13.5
  },
  "oczekiwanie_min": 0.0,
  "kontynuacje_tur": 0,
- "sesje": []
+ "sesje": [
+  {
+   "start": "2026-10-10T06:05:26Z",
+   "koniec": "2026-10-10T06:18:56Z",
+   "tury": 42,
+   "przyczyna": "terminal_reason=completed"
+  }
+ ]
 }
