@@ -2,16 +2,25 @@
  "rodzic": "3.3",
  "rodzic_sha": "d20294cbf1fc66d694c8355d53791165c748fb38",
  "kolejnosc": 15,
- "sha": "d20294cbf1fc66d694c8355d53791165c748fb38",
- "stan": "sesja",
- "gist": "",
- "notatki": [],
+ "sha": "e6731847fdb833b91486f733ee3b75274dca7b91",
+ "stan": "ocena w toku",
+ "gist": "Kombinacja 3.3 (dead, fit po typach, BEAM 70) i kara hard z 2.3 (trójki trudnych typów, waga 400)",
+ "notatki": [
+  "Kombinacja 3.3 (dead, fit po typach, BEAM 70) i kara hard z 2.3 (trójki trudnych typów, waga 400)\n\nMechanizm: do ocen FINAL liści dodane DFS-owe sprawdzenie 35 tacek z 5 najtrudniejszych typów\n(3x3, duże L, 1x5, 2x3, przekątna 3), kara 400*odsetek niegrywalnych - przeniesione z 2.3.\nDowód: 2.3 (hard 400) 0.908 vs 2.2 0.874; 3.3 0.906 vs 3.2 0.890. Dwa niezależne ulepszenia\nna różnych bazach, ta kombinacja nie była mierzona.\nLokalnie (nie ocena): smoke 24 partie/limit 500 bez wywrotki, 8 przegranych, ok. 86 s.\nRyzyko: koszt czasu (~15% więcej niż 3.3), redundancja z dead/zero.\n\nCo dalej: zrobione (ten commit). Następny krok: po ocenie, jeśli gorzej niż 0.908, wyłączyć hard\nlub dead. Nie powtarzać: hard=1000, deadrem, SAMPLES/FINAL w górę.\n\nCo-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+ ],
  "koszt": {
-  "tury": 0,
-  "usd": 0.0,
-  "minuty": 0.0
+  "tury": 12,
+  "usd": 0.1792,
+  "minuty": 2.6
  },
  "oczekiwanie_min": 0.0,
  "kontynuacje_tur": 0,
- "sesje": []
+ "sesje": [
+  {
+   "start": "2026-10-10T03:34:41Z",
+   "koniec": "2026-10-10T03:37:15Z",
+   "tury": 12,
+   "przyczyna": "terminal_reason=completed"
+  }
+ ]
 }
