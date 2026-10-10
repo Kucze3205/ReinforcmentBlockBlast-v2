@@ -107,20 +107,21 @@ HARD = (7, 9, 4, 6, 12)    # 3x3, duże L, 1x5, 2x3, przekątna 3
 class SurvivalPolicy:
     name = "survival"
 
-    def __init__(self, beam=100, final=10, final_crowded=24, trays=12, risk_w=60.0, hard_w=400.0):
+    def __init__(self, beam=100, final=10, final_crowded=24, trays=12, risk_w=60.0, hard_w=400.0, trays_crowded=36):
+        self.trays_crowded = trays_crowded
         self.beam, self.final, self.final_crowded = beam, final, final_crowded
         self.trays, self.risk_w, self.hard_w = trays, risk_w, hard_w
 
     def reset(self, game_seed):
         self.rng = random.Random(f"surv:{game_seed}")
 
-    def _risk(self, b):
+    def _risk(self, b, n):
         rng, bad = self.rng, 0
-        for _ in range(self.trays):
+        for _ in range(n):
             ps = [rng.choice(PIECE_TYPES[rng.randrange(15)]) for _ in range(3)]
             if not playable(b, ps):
                 bad += 1
-        return bad / self.trays
+        return bad / n
 
     def _new_hard(self):
         """Trójki trudnych typów z wagą = liczba uporządkowań (1/3/6 z 125); obroty losowane przy każdym ruchu."""
@@ -176,9 +177,10 @@ class SurvivalPolicy:
         leaves.sort(key=lambda kv: -kv[1][0])
         crowded = b.bit_count() > 40
         top = leaves[: self.final_crowded if crowded else self.final]
+        ntr = self.trays_crowded if crowded else self.trays
         best, best_s = None, None
         for (bd, _), (sc, first) in top:
-            s = sc - self.risk_w * self._risk(bd) - self.hard_w * self._hard_risk(bd)
+            s = sc - self.risk_w * self._risk(bd, ntr) - self.hard_w * self._hard_risk(bd)
             if best_s is None or s > best_s:
                 best, best_s = first, s
         return tuple(best)
