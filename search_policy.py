@@ -5,6 +5,8 @@ Plan trzech postawień liczony raz na tackę, wykonywany krok po kroku. Liście 
 oceniane ryzykiem, że następna tacka nie ma żadnego pasującego klocka.
 """
 import random
+from bisect import bisect_left
+from itertools import accumulate
 
 from pieces import PIECE_POOL, PIECE_TYPES
 
@@ -39,6 +41,12 @@ def _pose_masks():
 
 _MASKS = _pose_masks()
 
+# Rozkład generatora: typ jednostajnie (1/15), potem poza jednostajnie w obrębie typu.
+_POSE_W = [0.0] * len(PIECE_POOL)
+for _poses in PIECE_TYPES:
+    for _pi in _poses:
+        _POSE_W[_pi] = 1.0 / (len(PIECE_TYPES) * len(_poses))
+
 
 def _clear(board):
     """Zwraca (plansza po czyszczeniu, liczba linii)."""
@@ -63,7 +71,8 @@ P = {"occ": 1.4, "iso": 0.75, "edge": 1.5, "wall": 2.0, "line": 4.2,
      "risk": 400.0, "fit": 80.0, "dead": 12.3,
      "beam": 40, "final": 12, "mid": 0,
      "hard": 500.0, "nhard": 16,
-     "two": 300.0, "pairs": 4, "budget": 150}
+     "two": 300.0, "pairs": 4, "budget": 150,
+     "joint": 500.0, "jk": 16, "jbudget": 150}
 
 
 def _cheap(board):
@@ -116,20 +125,22 @@ def _playable_within(board, poses, left):
 
 
 def _fit_stats(board):
-    """(średnia po typach z odsetka pasujących póz, liczba typów bez żadnego miejsca)."""
+    """(średnia po typach z odsetka pasujących póz, liczba typów bez miejsca, pasujące pozy)."""
     tot = 0.0
     dead_types = 0
+    fits = []
     for poses in PIECE_TYPES:
         fit = 0
         for pi in poses:
             for _x, _y, m in _MASKS[pi]:
                 if not board & m:
                     fit += 1
+                    fits.append(pi)
                     break
         if fit == 0:
             dead_types += 1
         tot += fit / len(poses)
-    return tot / len(PIECE_TYPES), dead_types
+    return tot / len(PIECE_TYPES), dead_types, fits
 
 
 class SearchPolicy:
@@ -158,13 +169,14 @@ class SearchPolicy:
         ]
 
     def _leaf(self, board, lines):
-        mean_fit, dead_types = _fit_stats(board)
+        mean_fit, dead_types, fits = _fit_stats(board)
         risk = (1.0 - mean_fit) ** 3
         playable = [_playable(board, t) for t in self._trays] if P["hard"] else []
         hard = sum(not ok for ok in playable) / len(playable) if playable else 0.0
         return (
             -P["hard"] * hard +
             -P["two"] * self._two_tray(board, playable) +
+            -P["joint"] * self._joint(board, mean_fit, fits) +
             _cheap(board)
             + P["line"] * lines
             - P["risk"] * risk
@@ -185,9 +197,23 @@ class SearchPolicy:
                 bad += 1
         return bad / pairs
 
+    def _joint(self, board, mean_fit, fits):
+        """P(tacka bez martwych klocków jest nierozkładalna), próbki z rozkładu generatora."""
+        if not P["joint"] or not fits:
+            return 0.0
+        cum = list(accumulate(_POSE_W[p] for p in fits))
+        total = cum[-1]
+        bad = 0
+        for us in self._us:
+            tray = tuple(fits[bisect_left(cum, u * total)] for u in us)
+            if not _playable_within(board, tray, [int(P["jbudget"])]):
+                bad += 1
+        return mean_fit ** 3 * bad / len(self._us)
+
     def _search(self, board, poses):
         """poses: lista (idx_w_tacce, pose). Zwraca najlepszy ciąg (idx, x, y) lub None."""
         self._trays = self._hard_trays() if P["hard"] else []
+        self._us = [[self.rng.random() for _ in range(3)] for _ in range(int(P["jk"]))]
         states = [(board, 0, tuple(range(len(poses))), ())]
         for depth in range(len(poses)):
             nxt = {}
