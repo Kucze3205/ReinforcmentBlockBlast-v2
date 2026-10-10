@@ -58,6 +58,13 @@ class ModelPolicy:
         return tuple(move)
 
 
+def build(weights=None):
+    """Wejście oceny: obiekt z reset(seed) i act(game, actions)."""
+    from survival import build as _build
+
+    return _build(weights)
+
+
 def _immediate_gain(game, action):
     """Punkty, które da to postawienie — wg skalibrowanego wzoru, bez zmiany stanu gry."""
     idx, x, y = action
