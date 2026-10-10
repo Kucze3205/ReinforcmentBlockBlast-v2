@@ -101,25 +101,41 @@ def playable(b, ps, budget=1500):
     return rec(b, (1 << len(ps)) - 1)
 
 
+HARD = (7, 9, 4, 6, 12)    # 3x3, duże L, 1x5, 2x3, przekątna 3
+
+
 class SurvivalPolicy:
     name = "survival"
 
-    def __init__(self, beam=40, final=10, final_crowded=24, trays=40, risk_w=60.0):
+    def __init__(self, beam=100, final=10, final_crowded=24, trays=12, risk_w=60.0, hard_w=400.0):
         self.beam, self.final, self.final_crowded = beam, final, final_crowded
-        self.trays, self.risk_w = trays, risk_w
+        self.trays, self.risk_w, self.hard_w = trays, risk_w, hard_w
 
     def reset(self, game_seed):
         self.rng = random.Random(f"surv:{game_seed}")
 
+    def _new_trays(self):
+        """Próbne tacki i trudne trójki losowane raz na ruch, wspólne dla wszystkich liści (CRN)."""
+        rng = self.rng
+        self.samples = [[rng.choice(PIECE_TYPES[rng.randrange(15)]) for _ in range(3)]
+                        for _ in range(self.trays)]
+        out = []
+        for i in range(len(HARD)):
+            for j in range(i, len(HARD)):
+                for k in range(j, len(HARD)):
+                    n = len({i, j, k})
+                    w = 6 if n == 3 else 3 if n == 2 else 1
+                    out.append((w, [rng.choice(PIECE_TYPES[HARD[t]]) for t in (i, j, k)]))
+        self.hard = out
+
     def _risk(self, b):
-        rng, bad = self.rng, 0
-        for _ in range(self.trays):
-            ps = [rng.choice(PIECE_TYPES[rng.randrange(15)]) for _ in range(3)]
-            if not playable(b, ps):
-                bad += 1
-        return bad / self.trays
+        return sum(not playable(b, ps) for ps in self.samples) / self.trays
+
+    def _hard_risk(self, b):
+        return sum(w for w, ps in self.hard if not playable(b, ps)) / 125.0
 
     def act(self, game, actions):
+        self._new_trays()
         grid = game.board.grid
         b = 0
         for r in range(8):
@@ -159,7 +175,7 @@ class SurvivalPolicy:
         top = leaves[: self.final_crowded if crowded else self.final]
         best, best_s = None, None
         for (bd, _), (sc, first) in top:
-            s = sc - self.risk_w * self._risk(bd)
+            s = sc - self.risk_w * self._risk(bd) - self.hard_w * self._hard_risk(bd)
             if best_s is None or s > best_s:
                 best, best_s = first, s
         return tuple(best)
