@@ -171,7 +171,7 @@ def risk(board, tight_max=8, tight_cnt=10):
 class SearchPolicy:
     name = "search"
 
-    def __init__(self, beam=40, final=20, samples=24, risk_w=750.0, mob_w=0.7, seed=0):
+    def __init__(self, beam=40, final=20, samples=24, risk_w=750.0, mob_w=1.4, seed=0):
         self.mob_w = mob_w
         self.beam, self.final, self.samples = beam, final, samples
         self.risk_w = risk_w

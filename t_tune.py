@@ -9,8 +9,8 @@ sys.path.insert(0, ".")
 import policies_search as ps
 from game import Game
 
-DEFAULT = dict(line=0.0, fill=3.0, iso=30.0, pocket=25.0, trans=8.0, clear=10.0,
-               risk_w=1500.0, mob_w=1.0)
+DEFAULT = dict(line=0.0, fill=6.0, iso=15.0, pocket=70.0, trans=22.4, clear=10.0,
+               risk_w=750.0, mob_w=0.7)
 SEEDS, CAP = 16, 500
 
 
@@ -33,7 +33,7 @@ def score(pool, cfg, offset):
 
 
 if __name__ == "__main__":
-    rng = random.Random(1)
+    rng = random.Random(7)
     best = dict(DEFAULT)
     with Pool(4) as pool:
         t = time.time()
