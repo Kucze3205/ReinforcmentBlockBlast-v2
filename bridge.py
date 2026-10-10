@@ -33,7 +33,8 @@ FRAMES = 3
 KEEP = 10  # tyle ostatnich ruchów zachowuje zdjęcia i wpis w pomiar.json
 LICZNIK_CO = 10  # OCR licznika co tyle ruchów (i przed przegraną): odczyt kosztował 0,7 s z 4,9 s ruchu (#48)
 ZRZUTY_PO_RUCHU = 12  # tyle zrzutów czeka szybki odczyt stanu po ruchu, zanim wróci do wolnego
-DRAG_WAIT = 0.5  # klocek dogania palec z opóźnieniem
+DRAG_WAIT = 0.3  # klocek dogania palec z opóźnieniem; sonda #48: 0,3 s bez rozbieżności, 0,15 s już z nimi
+DRAG_STEPS = 10  # kroki przesunięcia palca; każde `input` na urządzeniu to ok. 30 ms
 CEL = int(os.environ.get("CEL", 0))  # licznik apki kończący partię; 0 = bez celu
 LIMIT_S = float(os.environ.get("LIMIT_MINUT", 0)) * 60  # 0 = bez limitu
 DRAG_GAIN = 1.5  # zmierzone: klocek przesuwa się 1,5 px na 1 px palca
@@ -232,8 +233,8 @@ def drag(slot_center, piece, x, y):
     cx, cy = BOARD_X + (x + w / 2) * CELL, BOARD_Y + (y + h / 2) * CELL
     fx = sx + (cx - sx) / DRAG_GAIN
     fy = sy + (cy - (sy - LIFT)) / DRAG_GAIN
-    # podniesienie i 10 kroków w jednym `adb shell`: osobne wywołania kosztowały 0,4 s na ruch (#48)
-    path = [(sx + (fx - sx) * k / 10, sy + (fy - sy) * k / 10) for k in range(1, 11)]
+    # podniesienie i kroki w jednym `adb shell`: osobne wywołania kosztowały 0,4 s na ruch (#48)
+    path = [(sx + (fx - sx) * k / DRAG_STEPS, sy + (fy - sy) * k / DRAG_STEPS) for k in range(1, DRAG_STEPS + 1)]
     adb("shell", "; ".join(["input motionevent DOWN %d %d" % (sx, sy)] +
                            ["input motionevent MOVE %d %d" % p for p in path]))
     time.sleep(DRAG_WAIT)
