@@ -2,8 +2,8 @@
 Polityka przeżycia: wiązka po tacce na bitboardach + szacunek ryzyka następnej tacki.
 
 Plansza to 64-bitowa liczba (bit y*8+x). Cel to nieprzegrywanie, więc punkty się nie liczą:
-wiązka układa całą tackę (3 klocki, dowolna kolejność), a koszt liści obejmuje szacunek
-prawdopodobieństwa, że losowa następna tacka będzie niegrywalna.
+wiązka układa całą tackę (3 klocki, dowolna kolejność). Liście porządkuje najpierw liczba
+niegrywalnych tacek z trudnych typów w próbie, potem wartość następnej tacki, na końcu koszt planszy.
 """
 import random
 
@@ -13,9 +13,8 @@ FULL = (1 << 64) - 1
 COL0 = 0x0101010101010101
 COL7 = COL0 << 7
 BEAM = 30
-FINAL = 8
-RISK_SAMPLES = 40
-RISK_W = 600.0
+FINAL = 12
+RISK_SAMPLES = 16
 TRANS_W = 1.0
 ISO_W = 8.0
 FREE_W = 1.5
@@ -23,10 +22,9 @@ MOB_W = 15.0
 SMALL_W = 6.0
 MID = 80
 NEXT_K = 6
-NEXT_W = 1.0
 NEXT_BAD = 100.0
 NEXT_BEAM = 5
-HARD_TYPES = (3, 4, 6, 7, 10)  # beam4, beam5, rect23, square3, corner5
+HARD_TYPES = (4, 6, 7, 10, 9)  # beam5, rect23, square3, corner5, L
 
 
 def _build_tables():
@@ -175,37 +173,25 @@ class SearchPolicy:
 
     def _risk_trays(self):
         rng = self.rng
-        trays, weights = [], []
+        trays = []
         for _ in range(RISK_SAMPLES):
-            tray, w = [], 1.0
+            tray = []
             for _ in range(3):
-                t = rng.randrange(15) if rng.random() < 0.5 else rng.choice(HARD_TYPES)
-                n = len(PIECE_TYPES[t])
-                pose = PIECE_TYPES[t][rng.randrange(n)]
-                nat = 1.0 / (15 * n)
-                prop = 0.5 * nat + (0.5 / len(HARD_TYPES) / n if t in HARD_TYPES else 0.0)
-                w *= nat / prop
-                tray.append(pose)
+                poses = PIECE_TYPES[rng.choice(HARD_TYPES)]
+                tray.append(poses[rng.randrange(len(poses))])
             trays.append(tuple(tray))
-            weights.append(w)
-        return trays, weights
+        return trays
 
-    def _risk(self, b, trays, weights):
-        bad = tot = nxt = nw = 0.0
-        for i, (tr, w) in enumerate(zip(trays, weights)):
-            tot += w
+    def _risk(self, b, trays):
+        bad, nxt = 0, 0.0
+        for i, tr in enumerate(trays):
             if not _playable(b, tr):
-                bad += w
+                bad += 1
                 if i < NEXT_K:
-                    nxt += w * NEXT_BAD
-                    nw += w
+                    nxt += NEXT_BAD
             elif i < NEXT_K:
-                nxt += w * _tray_value(b, tr)
-                nw += w
-        r = RISK_W * bad / tot
-        if nw:
-            r += NEXT_W * nxt / nw
-        return r
+                nxt += _tray_value(b, tr)
+        return bad, nxt / NEXT_K
 
     def _search(self, b, poses):
         level = {(b, 7): (0.0, ())}
@@ -241,10 +227,10 @@ class SearchPolicy:
             if cost < 1e6:
                 mid.append((cost + MOB_W * _mobility(bd) + SMALL_W * _small_regions(bd), bd, path))
         mid.sort(key=lambda t: t[0])
-        trays, weights = self._risk_trays()
+        trays = self._risk_trays()
         best, best_cost = None, None
         for cost, bd, path in mid[:FINAL]:
-            c = cost + RISK_W * self._risk(bd, trays, weights)
+            c = (*self._risk(bd, trays), cost)
             if best_cost is None or c < best_cost:
                 best, best_cost = path, c
         return best
