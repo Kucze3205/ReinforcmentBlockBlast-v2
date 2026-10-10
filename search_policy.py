@@ -59,8 +59,8 @@ def _popcount(x):
     return bin(x).count("1")
 
 
-P = {"occ": 2.0, "iso": 1.5, "edge": 1.5, "wall": 2.0, "line": 3.0,
-     "risk": 400.0, "fit": 80.0, "dead": 16.9,
+P = {"occ": 1.4, "iso": 0.75, "edge": 1.5, "wall": 2.0, "line": 4.2,
+     "risk": 400.0, "fit": 80.0, "dead": 12.3,
      "beam": 40, "final": 12, "mid": 0,
      "hard": 500.0, "nhard": 16}
 
