@@ -1,7 +1,7 @@
 """Polityka przeżycia: wiązka po tacce na bitboardach (bit = y*8 + x)."""
 import random
 
-from pieces import PIECE_POOL
+from pieces import PIECE_POOL, PIECE_TYPES
 
 _FULL = (1 << 64) - 1
 _ROWS = [0xFF << (8 * r) for r in range(8)]
@@ -9,7 +9,7 @@ _COLS = [sum(1 << (8 * r + c) for r in range(8)) for c in range(8)]
 _NOT_COL0 = _FULL & ~_COLS[0]
 _NOT_COL7 = _FULL & ~_COLS[7]
 _LOW56 = (1 << 56) - 1
-W = {"trans": 3.0, "isolated": 4.0, "filled": 0.5, "fit": 1.5}
+W = {"trans": 3.0, "isolated": 4.0, "filled": 0.5, "fit": 1.5, "dead": 0.0}
 BEAM = 100
 FIT_LEAVES = 30
 
@@ -48,7 +48,25 @@ def _cheap(b):
     nb = (((b << 1) & _NOT_COL0) | _COLS[0]) & (((b >> 1) & _NOT_COL7) | _COLS[7]) \
         & (((b << 8) & _FULL) | _ROWS[0]) & ((b >> 8) | _ROWS[7])
     iso = bin(e & nb).count("1")
-    return W["trans"] * t + W["isolated"] * iso + W["filled"] * bin(b).count("1")
+    v = W["trans"] * t + W["isolated"] * iso + W["filled"] * bin(b).count("1")
+    if W["dead"]:
+        v += W["dead"] * _dead_types(b)
+    return v
+
+
+_DEAD = {}
+
+
+def _dead_types(b):
+    """Ile z 15 typów klocków nie ma żadnego położenia na planszy b."""
+    r = _DEAD.get(b)
+    if r is None:
+        r = sum(1 for poses in PIECE_TYPES
+                if not any(not b & m for i in poses for _, _, m in _POSE_MASKS[i]))
+        if len(_DEAD) > 300000:
+            _DEAD.clear()
+        _DEAD[b] = r
+    return r
 
 
 def _fit(b):
