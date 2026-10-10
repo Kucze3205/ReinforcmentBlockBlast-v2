@@ -60,7 +60,7 @@ def _popcount(x):
 
 
 P = {"occ": 1.4, "iso": 0.75, "edge": 1.5, "wall": 2.0, "line": 4.2,
-     "risk": 400.0, "fit": 80.0, "dead": 12.3,
+     "risk": 400.0, "fit": 80.0, "dead": 66.0,
      "beam": 40, "final": 12, "mid": 0,
      "hard": 500.0, "nhard": 16}
 
@@ -96,20 +96,18 @@ def _playable(board, poses):
 
 
 def _fit_stats(board):
-    """(średnia po typach z odsetka pasujących póz, liczba typów bez żadnego miejsca)."""
+    """(średnia po typach z odsetka pasujących póz, P(następna tacka ma klocek bez miejsca))."""
     tot = 0.0
-    dead_types = 0
+    q = 0.0
     for poses in PIECE_TYPES:
         fit = 0
         for pi in poses:
-            for _x, _y, m in _MASKS[pi]:
-                if not board & m:
-                    fit += 1
-                    break
-        if fit == 0:
-            dead_types += 1
+            if any(not board & m for _x, _y, m in _MASKS[pi]):
+                fit += 1
+            else:
+                q += 1.0 / (len(PIECE_TYPES) * len(poses))
         tot += fit / len(poses)
-    return tot / len(PIECE_TYPES), dead_types
+    return tot / len(PIECE_TYPES), 1.0 - (1.0 - q) ** 3
 
 
 class SearchPolicy:
@@ -138,7 +136,7 @@ class SearchPolicy:
         ]
 
     def _leaf(self, board, lines):
-        mean_fit, dead_types = _fit_stats(board)
+        mean_fit, dead_next = _fit_stats(board)
         risk = (1.0 - mean_fit) ** 3
         hard = 0.0
         if P["hard"] and self._trays:
@@ -149,7 +147,7 @@ class SearchPolicy:
             + P["line"] * lines
             - P["risk"] * risk
             - P["fit"] * (1.0 - mean_fit)
-            - P["dead"] * dead_types
+            - P["dead"] * dead_next
         )
 
     def _search(self, board, poses):
