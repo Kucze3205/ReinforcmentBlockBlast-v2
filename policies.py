@@ -58,6 +58,12 @@ class ModelPolicy:
         return tuple(move)
 
 
+def build(weights=None):
+    """Polityka oceniana: wiązka po tacce z ryzykiem trudnych tacek (survival.py)."""
+    from survival import SurvivalPolicy
+    return SurvivalPolicy()
+
+
 def _immediate_gain(game, action):
     """Punkty, które da to postawienie — wg skalibrowanego wzoru, bez zmiany stanu gry."""
     idx, x, y = action
