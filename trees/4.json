@@ -14,5 +14,9 @@
    "4.2"
   ]
  ],
- "koniec": null
+ "koniec": {
+  "powod": "zmiana ewaluatora (#48)",
+  "T_h": 3.61,
+  "V": 0.889212
+ }
 }
