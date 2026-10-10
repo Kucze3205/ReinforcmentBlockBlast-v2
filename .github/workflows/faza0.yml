@@ -1,4 +1,4 @@
-# Faza 0: seria 10 partii bazowego agenta (polityka z gałęzi domyślnej) na emulatorze, a z jej logów
+# Faza 0: seria partii bazowego agenta (polityka z gałęzi domyślnej) na emulatorze, a z jej logów
 # kalibracja symulatora. Bez rozjazdu zakłada trees/faza0.json (pierwsze drzewo czeka na ten plik);
 # z rozjazdem albo unieważnioną partią otwiera utrzymanie ewaluatora, a po jego naprawie startuje od nowa.
 #   gh workflow run faza0.yml
