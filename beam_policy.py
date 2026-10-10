@@ -69,14 +69,24 @@ def _dead_types(b):
     return r
 
 
+ZERO = 5.0
+
+
 def _fit(b):
-    n = 0
-    for lst in _POSE_MASKS:
-        for _, _, m in lst:
-            if not b & m:
-                n += 1
+    """Dopasowanie po typach (jak w 4.2/4.4): do 4 położeń na typ, typ bez miejsca = kara."""
+    tot = 0.0
+    for t in PIECE_TYPES:
+        n = 0
+        for i in t:
+            for _, _, m in _POSE_MASKS[i]:
+                if not b & m:
+                    n += 1
+                    if n >= 4:
+                        break
+            if n >= 4:
                 break
-    return n
+        tot += n / 2.0 if n else -ZERO / W["fit"]
+    return tot
 
 
 def _tray_ok(b, poses):
