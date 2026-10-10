@@ -107,7 +107,7 @@ HARD = (7, 9, 4, 6, 12)    # 3x3, duże L, 1x5, 2x3, przekątna 3
 class SurvivalPolicy:
     name = "survival"
 
-    def __init__(self, beam=100, final=10, final_crowded=48, trays=12, risk_w=60.0, hard_w=400.0):
+    def __init__(self, beam=100, final=10, final_crowded=24, trays=12, risk_w=60.0, hard_w=400.0):
         self.beam, self.final, self.final_crowded = beam, final, final_crowded
         self.trays, self.risk_w, self.hard_w = trays, risk_w, hard_w
 
@@ -133,12 +133,27 @@ class SurvivalPolicy:
                     out.append((w, [rng.choice(PIECE_TYPES[HARD[t]]) for t in (i, j, k)]))
         self.hard = out
 
+    def _new_all(self):
+        """Wszystkie multizbiory trójek z 15 typów, waga = liczba uporządkowań; obroty losowane co ruch."""
+        rng, out = self.rng, []
+        for i in range(15):
+            for j in range(i, 15):
+                for k in range(j, 15):
+                    n = len({i, j, k})
+                    w = 6 if n == 3 else 3 if n == 2 else 1
+                    out.append((w, [rng.choice(PIECE_TYPES[t]) for t in (i, j, k)]))
+        self.allt = out
+
+    def _all_risk(self, b):
+        return sum(w for w, ps in self.allt if not playable(b, ps)) / 3375.0
+
     def _hard_risk(self, b):
         bad = sum(w for w, ps in self.hard if not playable(b, ps))
         return bad / 125.0
 
     def act(self, game, actions):
         self._new_hard()
+        self._new_all()
         grid = game.board.grid
         b = 0
         for r in range(8):
@@ -178,7 +193,7 @@ class SurvivalPolicy:
         top = leaves[: self.final_crowded if crowded else self.final]
         best, best_s = None, None
         for (bd, _), (sc, first) in top:
-            s = sc - self.risk_w * self._risk(bd) - self.hard_w * self._hard_risk(bd)
+            s = sc - self.risk_w * self._all_risk(bd) - self.hard_w * self._hard_risk(bd)
             if best_s is None or s > best_s:
                 best, best_s = first, s
         return tuple(best)
