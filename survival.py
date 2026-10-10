@@ -12,14 +12,20 @@ from pieces import PIECE_POOL, PIECE_TYPES
 FULL = (1 << 64) - 1
 COL0 = 0x0101010101010101
 COL7 = COL0 << 7
-BEAM = 24
-FINAL = 10
+BEAM = 30
+FINAL = 8
 RISK_SAMPLES = 40
 RISK_W = 600.0
 TRANS_W = 1.0
 ISO_W = 8.0
 FREE_W = 1.5
 MOB_W = 15.0
+SMALL_W = 6.0
+MID = 80
+NEXT_K = 6
+NEXT_W = 1.0
+NEXT_BAD = 100.0
+NEXT_BEAM = 5
 HARD_TYPES = (3, 4, 6, 7, 10)  # beam4, beam5, rect23, square3, corner5
 
 
@@ -101,12 +107,54 @@ def _playable(b, pcs):
     return False
 
 
-def _count_fit(b, p):
-    n = 0
-    for m in _MASKS[p]:
-        if not (b & m):
-            n += 1
-    return n
+def _tray_value(b, pcs):
+    """Najlepszy tani koszt planszy po ułożeniu tacki pcs (wąska wiązka); niski = dobrze."""
+    level = {(b, 7): 0}
+    for depth in range(3):
+        nxt = {}
+        for (bd, rem) in level:
+            for s in range(3):
+                if not rem & (1 << s):
+                    continue
+                for m in _MASKS[pcs[s]]:
+                    if bd & m:
+                        continue
+                    nb = _clear(bd | m)
+                    key = (nb, rem & ~(1 << s))
+                    if key not in nxt:
+                        nxt[key] = _cheap(nb)
+        if not nxt:
+            return NEXT_BAD
+        level = dict(sorted(nxt.items(), key=lambda kv: kv[1])[:NEXT_BEAM])
+    return min(level.values())
+
+
+def _pose_shifts():
+    out = []
+    for p in PIECE_POOL:
+        h, w = len(p.shape), len(p.shape[0])
+        valid = 0
+        for y in range(8 - h + 1):
+            for x in range(8 - w + 1):
+                valid |= 1 << (y * 8 + x)
+        shifts = [dy * 8 + dx for dy, row in enumerate(p.shape) for dx, c in enumerate(row) if c]
+        out.append((shifts, valid))
+    return out
+
+
+_POSE_SHIFTS = _pose_shifts()
+
+
+def _mobility(b):
+    """Suma po pozach 1/(1+liczba położeń): duża, gdy któraś poza prawie nie ma miejsca."""
+    e = ~b & FULL
+    total = 0.0
+    for shifts, valid in _POSE_SHIFTS:
+        m = valid
+        for s in shifts:
+            m &= e >> s
+        total += 1.0 / (1 + m.bit_count())
+    return total
 
 
 class SearchPolicy:
@@ -143,12 +191,21 @@ class SearchPolicy:
         return trays, weights
 
     def _risk(self, b, trays, weights):
-        bad = tot = 0.0
-        for tr, w in zip(trays, weights):
+        bad = tot = nxt = nw = 0.0
+        for i, (tr, w) in enumerate(zip(trays, weights)):
             tot += w
             if not _playable(b, tr):
                 bad += w
-        return bad / tot
+                if i < NEXT_K:
+                    nxt += w * NEXT_BAD
+                    nw += w
+            elif i < NEXT_K:
+                nxt += w * _tray_value(b, tr)
+                nw += w
+        r = RISK_W * bad / tot
+        if nw:
+            r += NEXT_W * nxt / nw
+        return r
 
     def _search(self, b, poses):
         level = {(b, 7): (0.0, ())}
@@ -179,13 +236,15 @@ class SearchPolicy:
         leaves.sort(key=lambda t: t[0])
         if not leaves or leaves[0][0] >= 1e6:
             return leaves[0][2] if leaves else None
+        mid = []
+        for cost, bd, path in leaves[:MID]:
+            if cost < 1e6:
+                mid.append((cost + MOB_W * _mobility(bd) + SMALL_W * _small_regions(bd), bd, path))
+        mid.sort(key=lambda t: t[0])
         trays, weights = self._risk_trays()
         best, best_cost = None, None
-        for cost, bd, path in leaves[:FINAL]:
-            if cost >= 1e6:
-                continue
-            c = cost + RISK_W * self._risk(bd, trays, weights) + 6.0 * _small_regions(bd)
-            c += MOB_W * sum(1.0 / (1 + _count_fit(bd, p)) for p in range(len(_MASKS)))
+        for cost, bd, path in mid[:FINAL]:
+            c = cost + RISK_W * self._risk(bd, trays, weights)
             if best_cost is None or c < best_cost:
                 best, best_cost = path, c
         return best
