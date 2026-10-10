@@ -73,7 +73,7 @@ def cheap(b):
     return room - (W_POP * b.bit_count() + W_HOLE * hole + W_POCK * pock + W_TRANS * trans)
 
 
-def playable(b, ps, budget=400):
+def playable(b, ps, budget=1500):
     """Czy da się postawić wszystkie klocki ps (w dowolnej kolejności)? Przy wyczerpaniu budżetu: tak."""
     seen = set()
     nodes = [0]
@@ -104,7 +104,7 @@ def playable(b, ps, budget=400):
 class SurvivalPolicy:
     name = "survival"
 
-    def __init__(self, beam=40, final=10, final_crowded=24, trays=24, risk_w=60.0):
+    def __init__(self, beam=40, final=10, final_crowded=24, trays=40, risk_w=60.0):
         self.beam, self.final, self.final_crowded = beam, final, final_crowded
         self.trays, self.risk_w = trays, risk_w
 
