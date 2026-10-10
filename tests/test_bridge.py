@@ -24,12 +24,13 @@ class MostTest(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.saved = {k: getattr(bridge, k) for k in (
             "OUT", "CEL", "LIMIT_S", "settled_state", "stable_state", "read_score", "in_game",
-            "drag", "annotate", "screenshot")}
+            "drag", "annotate", "screenshot", "state_after", "read_board", "read_tray")}
         self.saved_sleep, bridge.time.sleep = bridge.time.sleep, lambda s: None
         self.game = Game(seed=7)
         bridge.OUT = self.tmp.name
         bridge.CEL = bridge.LIMIT_S = 0
         bridge.settled_state = bridge.stable_state = self.screen
+        bridge.state_after = lambda expected, tray_left: bridge.readable(bridge.stable_state())
         bridge.read_score = lambda img: self.game.score
         bridge.screenshot = lambda: self.img
         bridge.in_game = lambda: True
@@ -70,6 +71,45 @@ class MostTest(unittest.TestCase):
         img[70:130, 60:260] = np.asarray(Image.open(ROOT / "tests" / "fixtures" / "licznik_5845.png").convert("RGB"))
         self.assertEqual(self.saved["read_score"](img), 5845)
         self.assertIsNone(self.saved["read_score"](np.zeros((640, 320, 3), dtype=int)))
+
+    def klatki(self, odczyty):
+        """screenshot() oddaje kolejne numery klatek, odczyt planszy i tacki bierze je z listy (plansza, tacka)."""
+        it = iter(range(len(odczyty)))
+        bridge.screenshot = lambda: next(it)
+        bridge.read_board = lambda k: odczyty[k][0]
+        bridge.read_tray = lambda k: odczyty[k][1]
+
+    def test_stan_po_ruchu_dwie_zgodne_klatki_bez_wolnego_odczytu(self):
+        bridge.state_after = self.saved["state_after"]
+        pusta, po = [[0] * 8 for _ in range(8)], [[1] + [0] * 7] + [[0] * 8 for _ in range(7)]
+        klocek = [[1]]
+        reszta = [None, (klocek, (140, 500)), None]
+        self.klatki([(pusta, reszta), (po, [None, (klocek, (150, 520)), None]), (po, reszta), (po, reszta)])
+        bridge.stable_state = lambda: self.fail("wolny odczyt")
+        img, grid, slots = bridge.state_after(po, [None, klocek, None])
+        self.assertEqual((img, grid, slots), (3, po, reszta))
+
+    def test_stan_po_ruchu_po_ostatnim_klocku_czeka_na_trzy_nowe(self):
+        bridge.state_after = self.saved["state_after"]
+        po = [[0] * 8 for _ in range(8)]
+        nowe = [([[1]], (40 + 100 * i, 500)) for i in range(3)]
+        self.klatki([(po, [None] * 3), (po, [None] * 3), (po, nowe[:2] + [None]), (po, nowe), (po, nowe)])
+        self.assertEqual(bridge.state_after(po, [None] * 3)[2], nowe)
+
+    def test_stan_po_ruchu_rozbieznosc_wraca_do_wolnego_odczytu(self):
+        bridge.state_after = self.saved["state_after"]
+        inna = [[1] * 8] + [[0] * 8 for _ in range(7)]
+        self.klatki([(inna, [None] * 3)] * bridge.ZRZUTY_PO_RUCHU)
+        bridge.stable_state = lambda: ("wolny", inna, [None] * 3)
+        self.assertEqual(bridge.state_after([[0] * 8 for _ in range(8)], [None] * 3)[0], "wolny")
+
+    def test_licznik_co_kilka_ruchow_i_przed_przegrana(self):
+        bridge.main(100000)
+        wpisy = [json.loads(l) for l in (Path(self.tmp.name) / "moves.jsonl").read_text().splitlines()]
+        z_licznikiem = [w["n"] for w in wpisy if w["score"] is not None]
+        self.assertEqual(z_licznikiem[:3], [0, bridge.LICZNIK_CO, 2 * bridge.LICZNIK_CO])
+        self.assertEqual(z_licznikiem[-1], wpisy[-1]["n"])
+        self.assertEqual(self.pomiar()["licznik"], self.game.score)
 
     def test_gra_do_przegranej(self):
         bridge.main(100000)
