@@ -2,16 +2,25 @@
  "rodzic": "4.2",
  "rodzic_sha": "1ea1914beb477e08075f6880500ec8658ee72e7e",
  "kolejnosc": 12,
- "sha": "1ea1914beb477e08075f6880500ec8658ee72e7e",
- "stan": "sesja",
- "gist": "",
- "notatki": [],
+ "sha": "e3dc2ecbea54875235d63b37eb73e3e9b82504ca",
+ "stan": "ocena w toku",
+ "gist": "Negatyw: cecha dead (typy bez miejsca) w całej wiązce + fit po typach nie pomaga",
+ "notatki": [
+  "Negatyw: cecha dead (typy bez miejsca) w całej wiązce + fit po typach nie pomaga\n\nMechanizm sprawdzony: _dead_types w _cheap (węzeł 3.2) połączone z fitem po typach (4.2).\nDowód (lokalny wskaźnik, NIE ocena; 48 partii, limit 500): dead=0 -> 18 przegranych, sr 401;\ndead=15 -> 24 przegranych, sr 356. Kod bez zmian względem 4.2 (0.885).\nPowód: fit po typach już karze typ bez miejsca w liściach FINAL; kara w całej wiązce\nściska ranking wiązki i wypiera lepsze liście.\n\nCo dalej: zrobione - brak zmiany kodu. Następny krok: kara za typ z jednym miejscem (n==1)\ntylko w _fit_score, albo FINAL 8->12 przy BEAM 60 (czas). Nie powtarzać: dead w _cheap (3.2, 4.2+dead).\n\nCo-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+ ],
  "koszt": {
-  "tury": 0,
-  "usd": 0.0,
-  "minuty": 0.0
+  "tury": 13,
+  "usd": 0.1755,
+  "minuty": 8.4
  },
  "oczekiwanie_min": 0.0,
  "kontynuacje_tur": 0,
- "sesje": []
+ "sesje": [
+  {
+   "start": "2026-10-10T03:00:23Z",
+   "koniec": "2026-10-10T03:08:49Z",
+   "tury": 13,
+   "przyczyna": "terminal_reason=completed"
+  }
+ ]
 }
