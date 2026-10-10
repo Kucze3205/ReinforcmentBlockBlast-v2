@@ -4,7 +4,11 @@ Polityka przeżycia: wiązka po tacce na bitboardach (bit = y * 8 + x).
 Plan trzech postawień liczony raz na tackę, wykonywany krok po kroku. Liście wiązki
 oceniane ryzykiem, że następna tacka nie ma żadnego pasującego klocka.
 """
+import random
+
 from pieces import PIECE_POOL, PIECE_TYPES
+
+HARD_TYPES = [4, 6, 7, 10, 9]  # beam5, rect23, square3, corner5, L
 
 _FULL = (1 << 64) - 1
 _ROWS = [0xFF << (8 * r) for r in range(8)]
@@ -55,9 +59,10 @@ def _popcount(x):
     return bin(x).count("1")
 
 
-P = {"occ": 1.0, "iso": 2.0, "edge": 1.5, "wall": 2.0, "line": 6.0,
-     "risk": 400.0, "fit": 40.0, "dead": 8.0,
-     "beam": 40, "final": 12}
+P = {"occ": 2.0, "iso": 1.5, "edge": 1.5, "wall": 2.0, "line": 3.0,
+     "risk": 400.0, "fit": 80.0, "dead": 16.9,
+     "beam": 40, "final": 12, "mid": 0,
+     "hard": 500.0, "nhard": 16}
 
 
 def _cheap(board):
@@ -72,6 +77,22 @@ def _cheap(board):
     walls = _popcount(empty & (_LEFT_WALL | _RIGHT_WALL | _TOP_WALL | _BOTTOM_WALL))
     return (-P["occ"] * _popcount(board) - P["iso"] * _popcount(three & empty)
             - P["edge"] * edges - P["wall"] * walls)
+
+
+def _playable(board, poses):
+    """Czy tackę (krotka póz) da się wyłożyć w całości, w dowolnej kolejności."""
+    if not poses:
+        return True
+    seen = set()
+    for k, pose in enumerate(poses):
+        if pose in seen:
+            continue
+        seen.add(pose)
+        rest = poses[:k] + poses[k + 1:]
+        for _x, _y, m in _MASKS[pose]:
+            if not board & m and _playable(_clear(board | m)[0], rest):
+                return True
+    return False
 
 
 def _fit_stats(board):
@@ -103,14 +124,27 @@ class SearchPolicy:
 
     def __init__(self):
         self.plan = []
+        self.rng = random.Random(0)
 
     def reset(self, game_seed):
         self.plan = []
+        self.rng = random.Random(game_seed)
+
+    def _hard_trays(self):
+        n = int(P["nhard"])
+        types = [PIECE_TYPES[t] for t in HARD_TYPES]
+        return [
+            tuple(self.rng.choice(self.rng.choice(types)) for _ in range(3)) for _ in range(n)
+        ]
 
     def _leaf(self, board, lines):
         mean_fit, dead_types = _fit_stats(board)
         risk = (1.0 - mean_fit) ** 3
+        hard = 0.0
+        if P["hard"] and self._trays:
+            hard = sum(not _playable(board, t) for t in self._trays) / len(self._trays)
         return (
+            -P["hard"] * hard +
             _cheap(board)
             + P["line"] * lines
             - P["risk"] * risk
@@ -120,6 +154,7 @@ class SearchPolicy:
 
     def _search(self, board, poses):
         """poses: lista (idx_w_tacce, pose). Zwraca najlepszy ciąg (idx, x, y) lub None."""
+        self._trays = self._hard_trays() if P["hard"] else []
         states = [(board, 0, tuple(range(len(poses))), ())]
         for depth in range(len(poses)):
             nxt = {}
@@ -141,6 +176,10 @@ class SearchPolicy:
             ranked = sorted(nxt.values(), key=lambda v: -v[0])
             keep = int(P["final"] if depth == len(poses) - 1 else P["beam"])
             states = [(v[1], v[2], v[3], v[4]) for v in ranked[:keep]]
+            mid = int(P["mid"])
+            if mid and depth < len(poses) - 1:
+                states.sort(key=lambda s: -self._leaf(s[0], s[1]))
+                states = states[:mid]
         best, best_s = None, None
         for bd, lines, _rem, seq in states:
             s = self._leaf(bd, lines)

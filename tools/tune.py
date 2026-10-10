@@ -16,7 +16,7 @@ import search_policy as sp  # noqa: E402
 
 GAMES = int(sys.argv[2]) if len(sys.argv) > 2 else 16
 LIMIT = int(sys.argv[3]) if len(sys.argv) > 3 else 600
-KEYS = ["occ", "iso", "edge", "wall", "line", "risk", "fit", "dead"]
+KEYS = ["occ", "iso", "edge", "wall", "line", "risk", "fit", "dead", "hard"]
 
 
 def play(args):
