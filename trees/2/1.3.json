@@ -2,16 +2,25 @@
  "rodzic": "1.2",
  "rodzic_sha": "4b6e8ef32480417b3f07050bf96d77e4b45e45ff",
  "kolejnosc": 9,
- "sha": "4b6e8ef32480417b3f07050bf96d77e4b45e45ff",
- "stan": "sesja",
- "gist": "",
- "notatki": [],
+ "sha": "8b35802a57723bf4943c1a60b542fa3fd1dec972",
+ "stan": "ocena w toku",
+ "gist": "Cecha dead (typy klocków bez położenia) w ocenie liści wiązki, wyłączona (dead=0)",
+ "notatki": [
+  "Cecha dead (typy klocków bez położenia) w ocenie liści wiązki, wyłączona (dead=0)\n\nMechanizm: _dead_types w _cheap, W[dead]; tools/cmp2.py porównuje dead 0/20/40.\nDowód (smoke, 48 partii seeds 200-247, limit 500; NIE ocena): śr. postawień / przegranych:\ndead 0: 374/22, 20: 370/21, 40: 360/23, czyli bez różnicy w granicach szumu, a czas 2x większy.\nDlatego domyślnie wyłączona. Odpowiada 3.2 (0.890 vs 3.1 0.882, zysk też w szumie).\nRyzyko: wynik niezmierzony przez ocenę.\n\nCo dalej: zrobione - ten commit. Następny krok: zmiana strukturalna, np. lookahead\nnastępnej tacki z wartością planszy po jej najlepszym rozegraniu (nie binarne ryzyko),\nalbo ocena po cechach z drzewa 1 (0.924), do odtworzenia z .historia/1.\nNie powtarzać: dead 20/40, BEAM 200, FIT_LEAVES 60, RISK_W 60.\n\nCo-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+ ],
  "koszt": {
-  "tury": 0,
-  "usd": 0.0,
-  "minuty": 0.0
+  "tury": 15,
+  "usd": 0.1811,
+  "minuty": 15.7
  },
  "oczekiwanie_min": 0.0,
  "kontynuacje_tur": 0,
- "sesje": []
+ "sesje": [
+  {
+   "start": "2026-10-10T03:00:14Z",
+   "koniec": "2026-10-10T03:15:57Z",
+   "tury": 15,
+   "przyczyna": "terminal_reason=completed"
+  }
+ ]
 }
