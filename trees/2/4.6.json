@@ -2,16 +2,25 @@
  "rodzic": "4.5",
  "rodzic_sha": "5b0741ffb223fa21d52802acaa8dd504f476481d",
  "kolejnosc": 23,
- "sha": "5b0741ffb223fa21d52802acaa8dd504f476481d",
- "stan": "sesja",
- "gist": "",
- "notatki": [],
+ "sha": "1fd238df765dd4b6c4ac00c43562a2ce80da4edb",
+ "stan": "ocena w toku",
+ "gist": "Hard-tacki losowane przy każdym ruchu (mechanizm 3.5) na bazie 4.5 (FINAL=10)",
+ "notatki": [
+  "Hard-tacki losowane przy każdym ruchu (mechanizm 3.5) na bazie 4.5 (FINAL=10)\n\nMechanizm: 3.5 (0.934) losował obroty trudnych typów co ruch; 4.5 (0.927, FINAL=10) nie. Kombinacja obu.\nDowód: 3.5 0.934 > 4.4 0.925; 4.5 0.927 w szumie. Ryzyko: wynik niezmierzony.\n\nCo dalej: zrobione (ten commit). Po ocenie: jeśli gorzej niż 0.934, wrócić do FINAL=8. Nie powtarzać: dead, hard=1000, FINAL=20.\n\nCo-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+ ],
  "koszt": {
-  "tury": 0,
-  "usd": 0.0,
-  "minuty": 0.0
+  "tury": 9,
+  "usd": 0.1351,
+  "minuty": 1.9
  },
  "oczekiwanie_min": 0.0,
  "kontynuacje_tur": 0,
- "sesje": []
+ "sesje": [
+  {
+   "start": "2026-10-10T04:52:41Z",
+   "koniec": "2026-10-10T04:54:32Z",
+   "tury": 9,
+   "przyczyna": "terminal_reason=completed"
+  }
+ ]
 }
