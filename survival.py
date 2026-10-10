@@ -76,10 +76,20 @@ def playable(b, tray):
     return False
 
 
+HARD_TRIPLES = []  # (trójka typów, waga multizbioru / 125)
+for _a in range(5):
+    for _b in range(_a, 5):
+        for _c in range(_b, 5):
+            _t = (HARD_TYPES[_a], HARD_TYPES[_b], HARD_TYPES[_c])
+            _n = len({_a, _b, _c})
+            HARD_TRIPLES.append((_t, {3: 6, 2: 3, 1: 1}[_n] / 125))
+
+
 class SurvivalPolicy:
     name = "survival"
 
-    def __init__(self, beam=150, final=24, samples=30, hard_w=60, risk_w=300):
+    def __init__(self, beam=150, final=24, samples=30, hard_w=60, risk_w=300, triple_w=400):
+        self.triple_w = triple_w
         self.beam, self.final = beam, final
         self.samples, self.hard_w, self.risk_w = samples, hard_w, risk_w
         self.rng = random.Random(0)
@@ -98,6 +108,9 @@ class SurvivalPolicy:
 
     def _risk(self, b):
         r = 0.0
+        for tray, w in HARD_TRIPLES:
+            if not playable(b, tray):
+                r += self.triple_w * w
         for t in HARD_TYPES:
             if not fits(b, t):
                 r += self.hard_w
