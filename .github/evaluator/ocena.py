@@ -253,7 +253,7 @@ def zlicz(drzewo, sym_dir, seria_dir, poprzednia, wezel=None):
 
 
 def bramka(ocena, cfg=None):
-    """Cel: pełna seria, każda partia dotarła do 1 mln bez przegranej."""
+    """Cel: pełna seria, każda partia dotarła do `cel` bez przegranej."""
     cfg = cfg or config()
     partie = (ocena.get("emu") or {}).get("partie", {})
     return len(partie) >= cfg["partie"] and all(p["koniec"] == "cel" for p in partie.values())

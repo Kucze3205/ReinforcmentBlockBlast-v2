@@ -14,6 +14,7 @@ sys.path.append(str(ROOT / ".github" / "evaluator"))   # procesy puli `sym` (spa
 import ocena  # noqa: E402
 
 CFG = ocena.config()
+P, C = CFG["partie"], CFG["cel"]
 
 
 def zapisz(path, obj):
@@ -173,8 +174,8 @@ class SymOcenaTest(unittest.TestCase):
 class SeriaTest(unittest.TestCase):
     def test_klasyfikacja_i_s_emu(self):
         with tempfile.TemporaryDirectory() as d:
-            pomiar(d, 1, "cel", 1_000_050)
-            pomiar(d, 2, "przegrana", 400_000, plansza=[[1]], ostatnie_ruchy=[{"n": 1}])
+            pomiar(d, 1, "cel", C + 50)
+            pomiar(d, 2, "przegrana", 0.4 * C, plansza=[[1]], ostatnie_ruchy=[{"n": 1}])
             pomiar(d, 3, "przerwanie", 10, przyczyna="limit czasu partii")
             (Path(d) / "seria-x-partia-4").mkdir()
             ok, niewazne = ocena.zlicz_seria(d, CFG)
@@ -185,9 +186,9 @@ class SeriaTest(unittest.TestCase):
             self.assertNotIn("plansza", ok[1])
             self.assertAlmostEqual(ocena.s_emu(ok, CFG), (1.0 + 0.4) / 2)
 
-    def test_s_emu_przegrana_po_milionie_licznika_liczy_sie_jako_przegrana_w_bramce(self):
-        partie = {str(k): {"koniec": "cel", "licznik": 1_000_001} for k in range(1, 10)}
-        partie["10"] = {"koniec": "przegrana", "licznik": 5_000_000}
+    def test_s_emu_przegrana_po_celu_licznika_liczy_sie_jako_przegrana_w_bramce(self):
+        partie = {str(k): {"koniec": "cel", "licznik": C + 1} for k in range(1, P)}
+        partie[str(P)] = {"koniec": "przegrana", "licznik": 5 * C}
         self.assertFalse(ocena.bramka({"emu": {"partie": partie}}))
 
 
@@ -210,13 +211,13 @@ class ZliczTest(unittest.TestCase):
     def test_zero_przegranych_wymaga_serii_a_bez_niej_s_v_to_1(self):
         o = self.run_zlicz([CFG["cap"]] * 3)
         self.assertEqual((o["status"], o["potrzebna_seria"]), ("w_toku", True))
-        self.assertEqual(o["brakujace_partie"], list(range(1, 11)))
+        self.assertEqual(o["brakujace_partie"], list(range(1, P + 1)))
         self.assertEqual(ocena.s_v(o["sym"], o["emu"]), 1.0)
 
     def test_pelna_seria_podnosi_s_v_nad_kazdy_wezel_bez_serii(self):
         with tempfile.TemporaryDirectory() as d:
-            for k in range(1, 11):
-                pomiar(d, k, "przegrana", 100_000)
+            for k in range(1, P + 1):
+                pomiar(d, k, "przegrana", 0.1 * C)
             o = self.run_zlicz([CFG["cap"]] * 3, seria=d)
             self.assertEqual(o["status"], "gotowa")
             self.assertAlmostEqual(ocena.s_v(o["sym"], o["emu"]), 1.1)
@@ -224,15 +225,15 @@ class ZliczTest(unittest.TestCase):
 
     def test_powtorka_scala_wazne_partie_z_poprzednia_ocena(self):
         with tempfile.TemporaryDirectory() as d:
-            for k in range(1, 9):
-                pomiar(d + "/a", k, "cel", 1_000_001)
-            for k in (9, 10):
+            for k in range(1, P - 1):
+                pomiar(d + "/a", k, "cel", C + 1)
+            for k in (P - 1, P):
                 pomiar(d + "/a", k, "przerwanie", None, przyczyna="gra zniknela")
             pierwsza = self.run_zlicz([CFG["cap"]] * 3, seria=d + "/a")
-            self.assertEqual((pierwsza["status"], pierwsza["brakujace_partie"]), ("w_toku", [9, 10]))
+            self.assertEqual((pierwsza["status"], pierwsza["brakujace_partie"]), ("w_toku", [P - 1, P]))
             zapisz(d + "/prev.json", pierwsza)
-            for k in (9, 10):
-                pomiar(d + "/b", k, "cel", 1_000_001)
+            for k in (P - 1, P):
+                pomiar(d + "/b", k, "cel", C + 1)
             koniec = self.run_zlicz([CFG["cap"]] * 3, seria=d + "/b", poprzednia=d + "/prev.json")
             self.assertEqual(koniec["status"], "gotowa")
             self.assertEqual(koniec["emu"]["niewazne"], [])
@@ -284,14 +285,14 @@ class ZapiszTest(unittest.TestCase):
     def test_seria_w_toku_nie_daje_s_emu_a_pelna_tak(self):
         with tempfile.TemporaryDirectory() as d:
             rek = self.rekord(d)
-            for k in range(1, 8):
-                pomiar(d + "/s", k, "przegrana", 100_000)
+            for k in range(1, P - 2):
+                pomiar(d + "/s", k, "przegrana", 0.1 * C)
             ocena.zapisz(self.ocena([CFG["cap"]] * 3, seria=d + "/s"), rek, d + "/cel.json")
             rec = json.loads(rek.read_text())
             self.assertEqual(rec["stan"], "ocena w toku")
             self.assertNotIn("s_emu", rec["oceny"])
-            for k in range(8, 11):
-                pomiar(d + "/s", k, "przegrana", 100_000)
+            for k in range(P - 2, P + 1):
+                pomiar(d + "/s", k, "przegrana", 0.1 * C)
             ocena.zapisz(self.ocena([CFG["cap"]] * 3, seria=d + "/s"), rek, d + "/cel.json")
             rec = json.loads(rek.read_text())
             self.assertEqual(rec["stan"], "oceniony")
@@ -301,16 +302,16 @@ class ZapiszTest(unittest.TestCase):
     def test_bramka_zaklada_znacznik_konca_petli(self):
         with tempfile.TemporaryDirectory() as d:
             rek = self.rekord(d)
-            for k in range(1, 11):
-                pomiar(d + "/s", k, "cel", 1_000_000)
+            for k in range(1, P + 1):
+                pomiar(d + "/s", k, "cel", C)
             ocena.zapisz(self.ocena([CFG["cap"]] * 3, seria=d + "/s"), rek, d + "/cel.json")
             self.assertEqual(json.loads((Path(d) / "cel.json").read_text())["drzewo"], "1")
 
 
 class BramkaTest(unittest.TestCase):
     def test_jedna_przegrana_albo_brak_partii_nie_otwiera_bramki(self):
-        cel = {"koniec": "cel", "licznik": 1_000_001}
-        pelna = {str(k): cel for k in range(1, 11)}
+        cel = {"koniec": "cel", "licznik": C + 1}
+        pelna = {str(k): cel for k in range(1, P + 1)}
         self.assertTrue(ocena.bramka({"emu": {"partie": pelna}}))
         self.assertFalse(ocena.bramka({"emu": {"partie": dict(pelna, **{"3": {"koniec": "przegrana", "licznik": 5}})}}))
         self.assertFalse(ocena.bramka({"emu": {"partie": {"1": cel}}}))

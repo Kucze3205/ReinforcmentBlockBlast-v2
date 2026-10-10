@@ -32,7 +32,7 @@ tylko przyjdzie faktura.
 ## Ewaluator (`ocena.yml`, `seria.yml`, `.github/evaluator/`)
 
 Ocena węzła: `gh workflow run ocena.yml -f wezel=<sha> -f drzewo=<t> -f id=<nazwa>`.
-Przebieg: 10 shardów symulatora (300 rozdań, cap 2000; w shardzie gry idą na wszystkich rdzeniach jobu, wynik gry zależy tylko od jej rozdania) → przy 0 przegranych seria 10 partii na
+Przebieg: 40 shardów symulatora (1200 rozdań, cap 500, limit shardu 10 min; 40 to limit jobów naraz, w shardzie gry idą na wszystkich rdzeniach jobu, wynik gry zależy tylko od jej rozdania) → przy 0 przegranych seria 80 partii po 125 tys. punktów (razem 10 mln; dwie tury po 40 jobów, partia mieści się w jobie) na
 emulatorze (`seria.yml`; serie paczki idą równolegle, nadmiar partii czeka w kolejce jobów GitHuba, bez `concurrency`, bo ta anuluje oczekujące uruchomienia) → artefakt `ocena-<id>` z `ocena.json`.
 Pierwszy krok pętli, `AUTOPILOT`, sprawdza `ocena.yml`; `seria.yml` wywołana z niego już go nie sprawdza.
 
@@ -42,7 +42,7 @@ Pierwszy krok pętli, `AUTOPILOT`, sprawdza `ocena.yml`; `seria.yml` wywołana z
 | `s_v` | `1 + s_emu` przy pełnej serii, inaczej `s_sym`; liczy `ocena.s_v()`, nie jest zapisywane |
 | próg serii | 0 przegranych w symulatorze i ocena nie „za wolna" (shard przekroczył `limit_shardu_s`) |
 | partia serii | `pomiar.json` z mostu: `koniec` = `cel` \| `przegrana` \| `przerwanie` \| `awaria`; ważne tylko dwie pierwsze |
-| powtórka | brakujące numery partii (`partie`); ważne partie z wcześniejszych przebiegów `ocena.yml` bierze z `oceny.emu` rekordu węzła (`ocena.py zlicz --poprzednia`); do pełnych 10 ważnych status to `w_toku` |
+| powtórka | brakujące numery partii (`partie`); ważne partie z wcześniejszych przebiegów `ocena.yml` bierze z `oceny.emu` rekordu węzła (`ocena.py zlicz --poprzednia`); do pełnej serii ważnych status to `w_toku` |
 | bramka celu | `ocena.py bramka ocena.json`: 10 ważnych partii, wszystkie `cel`; kod 0 = cel osiągnięty ; `ocena.yml` zakłada wtedy `trees/cel.json` — znacznik końca pętli, który ma sprawdzać harmonogram drzewa |
 | hash | `sym` (symulator, generator, punktacja, `ocena.py`, parametry, rozdania drzewa) i `most` (most, `seria.yml`, liczba partii i cel); naprawa mostu nie przelicza `s_sym` |
 | tylko do odczytu | pliki z `tylko_do_odczytu` w `config.json`: ewaluator nakłada je z gałęzi domyślnej na kopię węzła |

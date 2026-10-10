@@ -173,7 +173,7 @@ class WyzwalaczTest(unittest.TestCase):
             return kal.wyzwalacz(d, {"ok": rozjazd_ok}, proba)
 
     def wszystkie_wazne(self, d):
-        for k in range(1, 11):
+        for k in range(1, CFG["partie"] + 1):
             pomiar(d, k, "przegrana" if k % 2 else "cel")
 
     def test_czysta_seria_bez_rozjazdu_nic_nie_robi(self):
@@ -198,7 +198,7 @@ class WyzwalaczTest(unittest.TestCase):
         self.assertEqual(self.run_(ustaw, proba=K["ponowienia"]), "utrzymanie most")
 
     def test_seria_bez_zadnej_partii_to_ponowienie_calosci(self):
-        self.assertEqual(self.run_(lambda d: None), "ponow " + json.dumps(list(range(1, 11))))
+        self.assertEqual(self.run_(lambda d: None), "ponow " + json.dumps(list(range(1, CFG["partie"] + 1))))
 
     def test_przerwanie_mostu_otwiera_utrzymanie_od_razu(self):
         def ustaw(d):
