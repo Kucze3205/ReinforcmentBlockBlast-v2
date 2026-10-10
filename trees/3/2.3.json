@@ -2,16 +2,25 @@
  "rodzic": "2.2",
  "rodzic_sha": "e5d7e935a0e09db2d06552763393b89fba603282",
  "kolejnosc": 10,
- "sha": "e5d7e935a0e09db2d06552763393b89fba603282",
- "stan": "sesja",
- "gist": "",
- "notatki": [],
+ "sha": "2bc4c337274e2f7e206582d6cfa397a4648d8533",
+ "stan": "ocena w toku",
+ "gist": "Węzeł 4.2 (0.925) + wspólne próbki tacek dla liści (CRN)",
+ "notatki": [
+  "Węzeł 4.2 (0.925) + wspólne próbki tacek dla liści (CRN)\n\nMechanizm: kod 4.2 odtworzony z 4.patch (kara hard_w=400 za niegrywalne trudne trójki 3x3/L/1x5/2x3/diag3\nważone multizbiorem, beam 100, trays 12) plus zmiana: losowe tacki ryzyka losowane raz na ruch i wspólne\ndla wszystkich liści (jak trudne trójki), więc porównanie liści nie zależy od szumu próbek.\nDowód z historii: 4.2 = 0.925 najlepszy w drzewie 3; 2.2 pokazało, że CRN nie szkodzi (0.855 = baza 4.1).\nNie powtórka: pierwsza kombinacja 4.2 z CRN. Sprawdzone tylko, że działa (3 partie, ok. 5.5 ms/ruch); wyniku nie mierzyłem.\nRyzyko: wspólna próbka 12 tacek może faworyzować swoje osobliwości.\n\nCo dalej: zrobione (ten commit). Następny krok: po ocenie; jeśli gorzej niż 0.925, cofnąć CRN (_new_trays\ndla samych samples). Pomysły: trays/final w górę przy zapełnionej planszy. Nie powtarzać: dead, hard=1000.\n\nCo-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+ ],
  "koszt": {
-  "tury": 0,
-  "usd": 0.0,
-  "minuty": 0.0
+  "tury": 18,
+  "usd": 0.2332,
+  "minuty": 1.5
  },
  "oczekiwanie_min": 0.0,
  "kontynuacje_tur": 0,
- "sesje": []
+ "sesje": [
+  {
+   "start": "2026-10-10T07:11:38Z",
+   "koniec": "2026-10-10T07:13:05Z",
+   "tury": 18,
+   "przyczyna": "terminal_reason=completed"
+  }
+ ]
 }
