@@ -32,6 +32,8 @@ for _p in PIECE_POOL:
     PLACEMENTS.append(lst)
 PMASKS = [[m for m, _, _ in l] for l in PLACEMENTS]
 
+NC = [bin(ms[0]).count('1') for ms in PMASKS]
+
 # trudne typy: square3, corner5, beam5, rect23, diag3
 HARD_TYPES = [7, 10, 4, 6, 12]
 
@@ -93,7 +95,8 @@ def popcount(x):
 class SurvivalPolicy:
     name = "survival"
 
-    def __init__(self, beam=100, risk_cands=40, trays=12, risk_w=60.0, hard_w=400.0, frag_w=15.0, seed=0):
+    def __init__(self, beam=100, risk_cands=40, trays=12, risk_w=60.0, hard_w=400.0, frag_w=15.0, mob_w=1.4, seed=0):
+        self.mob_w = mob_w
         self.beam = beam
         self.risk_cands = risk_cands
         self.trays = trays
@@ -129,6 +132,7 @@ class SurvivalPolicy:
                     break
             frag += 2 - n
         r += self.frag_w * frag
+        r -= self.mob_w * sum(NC[i] for i, ms in enumerate(PMASKS) if any(not board & m for m in ms))
         self._rcache[board] = r
         return r
 
@@ -137,10 +141,16 @@ class SurvivalPolicy:
         if v is not None:
             return v
         empty = ~board & FULL
-        nb = ((empty << 1) & NOT_COL0) | ((empty >> 1) & NOT_COL7) | (empty << 8) | (empty >> 8)
-        iso = popcount(empty & ~nb & FULL)
+        bl = ((board << 1) & NOT_COL0) | COLS[0]
+        br = ((board >> 1) & NOT_COL7) | COLS[7]
+        bu = ((board << 8) & FULL) | ROWS[0]
+        bd = (board >> 8) | ROWS[7]
+        all4 = bl & br & bu & bd
+        at3 = (bl & br & bu) | (bl & br & bd) | (bl & bu & bd) | (br & bu & bd)
+        iso = popcount(empty & all4)
+        pocket = popcount(empty & at3 & ~all4)
         trans = popcount((board ^ (board >> 1)) & NOT_COL7) + popcount((board ^ (board >> 8)) & ROWS_0_6)
-        v = 8.0 * popcount(board) + 25.0 * iso + 4.0 * trans
+        v = 8.0 * popcount(board) + 25.0 * iso + 35.0 * pocket + 8.0 * trans
         if len(self._ccache) > 200000:
             self._ccache.clear()
         self._ccache[board] = v
@@ -184,14 +194,14 @@ class SurvivalPolicy:
                         if b & m:
                             continue
                         nb, n = clear(b | m)
-                        v = ln + n
+                        v = ln + 10.0 * n * n
                         old = new.get(nb)
                         if old is None or v > old[0]:
                             new[nb] = (v, first if first is not None else (slot, x, y))
                 if not new:
                     break
                 if len(new) > self.beam * 3:
-                    ranked = sorted(new.items(), key=lambda kv: self._cheap(kv[0]) - 40.0 * kv[1][0])
+                    ranked = sorted(new.items(), key=lambda kv: self._cheap(kv[0]) - kv[1][0])
                     new = dict(ranked[: self.beam * 3])
                 states = new
             else:
@@ -201,10 +211,10 @@ class SurvivalPolicy:
                         results[b] = (ln, first)
         if not results:
             return actions[0]
-        cands = sorted(results.items(), key=lambda kv: self._cheap(kv[0]) - 40.0 * kv[1][0])[: self.risk_cands]
+        cands = sorted(results.items(), key=lambda kv: self._cheap(kv[0]) - kv[1][0])[: self.risk_cands]
         best = None
         for b, (ln, first) in cands:
-            sc = self._cheap(b) - 40.0 * ln + self._risk(b, samples, hard_sets)
+            sc = self._cheap(b) - ln + self._risk(b, samples, hard_sets)
             if b == 0:
                 sc -= 500
             if best is None or sc < best[0]:
